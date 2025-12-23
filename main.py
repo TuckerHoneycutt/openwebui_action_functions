@@ -1516,7 +1516,7 @@ class Action:
                     const base64 = e.target.result.split(',')[1];
 
                     try {{
-                        showStatus('Sending file to server...', false);
+                        showStatus('Processing file...', false);
 
                         // Prepare file data
                         const fileData = {{
@@ -1525,109 +1525,99 @@ class Action:
                             messages: window.docFormatterChatMsgs || []
                         }};
 
-                        // Store in localStorage as backup
-                        localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
+                        // Store file data globally
                         window.docFormatterFileData = fileData;
+                        localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
 
-                        // Try to call the action function directly via the chat API
-                        // We'll inject the file data into the request body
-                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
-                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
-                                       localStorage.getItem('lastChatId');
+                        // Close modal
+                        closeModal();
 
-                        // Try to trigger the action function with file data
-                        // We'll use a custom event or modify the action call
-                        let processed = false;
+                        // Trigger the action function call with file data
+                        // We'll use __event_call__ mechanism by creating a custom event
+                        // that will be caught by OpenWebUI's action system
+                        showStatus('Calling action function with file data...', false);
 
-                        // Inject code that will intercept fetch calls to add file data
-                        // This will modify any fetch call to the action endpoint to include file data
-                        const injectFileDataScript = `
-                            (function() {{
-                                const storedData = localStorage.getItem('docFormatterFileData');
-                                if (!storedData) return;
+                        // Create a custom event to trigger action processing
+                        // This simulates clicking the action button but with file data included
+                        const actionEvent = new CustomEvent('openwebui:action:call', {{
+                            detail: {{
+                                action: 'output_to_document',
+                                data: fileData
+                            }}
+                        }});
+                        document.dispatchEvent(actionEvent);
 
-                                try {{
-                                    const fileData = JSON.parse(storedData);
+                        // Also try to find and trigger the action button programmatically
+                        // Look for action buttons and simulate a click
+                        setTimeout(() => {{
+                            // Try multiple ways to find the action button
+                            const actionSelectors = [
+                                '[data-action="output_to_document"]',
+                                'button[onclick*="output_to_document"]',
+                                '.action-button',
+                                '[data-function="output_to_document"]'
+                            ];
 
-                                    // Intercept fetch calls
-                                    const originalFetch = window.fetch;
-                                    window.fetch = function(...args) {{
-                                        const url = args[0];
-                                        const options = args[1] || {{}};
+                            let actionButton = null;
+                            for (const selector of actionSelectors) {{
+                                actionButton = document.querySelector(selector);
+                                if (actionButton) break;
+                            }}
 
-                                        // Check if this is a call to our action endpoint
-                                        if (typeof url === 'string' && url.includes('output_to_document')) {{
-                                            console.log('Intercepting action call, adding file data');
+                            if (actionButton) {{
+                                console.log('Found action button, triggering click with file data');
+                                // Store file data so it's available when button is clicked
+                                window.docFormatterPendingProcess = true;
+                                actionButton.click();
+                            }} else {{
+                                console.log('Action button not found, trying alternative method');
+                                // Alternative: Use fetch interceptor and show notification
+                                const notification = document.createElement('div');
+                                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
+                                notification.textContent = '✓ File ready! Click the action button to process.';
+                                document.body.appendChild(notification);
 
-                                            // Modify request body to include file data
-                                            if (options.body) {{
-                                                try {{
+                                // Install fetch interceptor
+                                const originalFetch = window.fetch;
+                                window.fetch = function(...args) {{
+                                    const url = args[0];
+                                    const options = args[1] || {{}};
+
+                                    if (typeof url === 'string' && url.includes('output_to_document')) {{
+                                        const storedData = localStorage.getItem('docFormatterFileData');
+                                        if (storedData) {{
+                                            try {{
+                                                const data = JSON.parse(storedData);
+                                                if (options.body) {{
                                                     const body = JSON.parse(options.body);
                                                     if (!body.file) {{
-                                                        body.file = fileData.file;
-                                                        body.file_extension = fileData.file_extension;
-                                                        body.messages = fileData.messages;
-                                                        body.chat_messages = fileData.messages;
+                                                        body.file = data.file;
+                                                        body.file_extension = data.file_extension;
+                                                        body.messages = data.messages;
+                                                        body.chat_messages = data.messages;
                                                         options.body = JSON.stringify(body);
-                                                        console.log('File data injected into request');
                                                         localStorage.removeItem('docFormatterFileData');
+                                                        if (document.body.contains(notification)) {{
+                                                            document.body.removeChild(notification);
+                                                        }}
                                                     }}
-                                                }} catch (e) {{
-                                                    console.error('Error modifying request body:', e);
                                                 }}
-                                            }} else {{
-                                                // Create body with file data
-                                                options.body = JSON.stringify({{
-                                                    file: fileData.file,
-                                                    file_extension: fileData.file_extension,
-                                                    messages: fileData.messages,
-                                                    chat_messages: fileData.messages
-                                                }});
-                                                options.headers = options.headers || {{}};
-                                                options.headers['Content-Type'] = 'application/json';
-                                                console.log('Created new request body with file data');
-                                                localStorage.removeItem('docFormatterFileData');
+                                            }} catch (e) {{
+                                                console.error('Error injecting file data:', e);
                                             }}
                                         }}
+                                    }}
 
-                                        return originalFetch.apply(this, args);
-                                    }};
+                                    return originalFetch.apply(this, args);
+                                }};
 
-                                    console.log('File data interceptor installed');
-                                }} catch (e) {{
-                                    console.error('Error setting up file data interceptor:', e);
-                                }}
-                            }})();
-                        `;
-
-                        // Inject the script
-                        const script = document.createElement('script');
-                        script.textContent = injectFileDataScript;
-                        document.head.appendChild(script);
-                        console.log('File data interceptor script injected');
-
-                        // Don't try to call the API directly - it requires proper authentication and model
-                        // Instead, rely on the fetch interceptor to inject file data when action button is clicked
-                        showStatus('File data prepared. Please click the action button again to process.', false);
-                        console.log('File data stored in localStorage. Click action button to process.');
-                        console.log('File data:', {{
-                            file_extension: fileData.file_extension,
-                            messages_count: fileData.messages?.length || 0,
-                            file_length: fileData.file?.length || 0
-                        }});
-
-                        setTimeout(() => {{
-                            closeModal();
-                            const notification = document.createElement('div');
-                            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
-                            notification.textContent = '✓ File ready! Click the action button again to process.';
-                            document.body.appendChild(notification);
-                            setTimeout(() => {{
-                                if (document.body.contains(notification)) {{
-                                    document.body.removeChild(notification);
-                                }}
-                            }}, 5000);
-                        }}, 1000);
+                                setTimeout(() => {{
+                                    if (document.body.contains(notification)) {{
+                                        document.body.removeChild(notification);
+                                    }}
+                                }}, 5000);
+                            }}
+                        }}, 500);
                     }} catch (error) {{
                         showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
                         console.error('Document formatter error:', error);
@@ -1882,13 +1872,45 @@ class Action:
                 os.unlink(temp_input_path)
                 os.unlink(output_path.name)
 
+                # Prepare file data for download
+                file_base64 = base64.b64encode(output_bytes).decode('utf-8')
+                filename = "formatted_chat.docx"
+
+                # Use __event_call__ to trigger download automatically (like prior.py does)
+                if __event_call__:
+                    download_script = f"""
+                        (function() {{
+                            const base64Data = '{file_base64}';
+                            const filename = '{filename}';
+                            const blob = new Blob([atob(base64Data)], {{ type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                        }})();
+                    """
+                    try:
+                        await __event_call__({
+                            "type": "execute",
+                            "data": {
+                                "code": download_script
+                            }
+                        })
+                        print("[DOC_FORMATTER] Download triggered via __event_call__", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[DOC_FORMATTER] Error triggering download: {str(e)}", file=sys.stderr)
+
                 # Return result - OpenWebUI typically expects file data or download URL
                 return {
                     "success": True,
                     "message": "Document formatted successfully!",
                     "file": {
-                        "content": base64.b64encode(output_bytes).decode('utf-8'),
-                        "filename": "formatted_chat.docx",
+                        "content": file_base64,
+                        "filename": filename,
                         "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     },
                     "download_url": None  # Can be set if you have a file server
