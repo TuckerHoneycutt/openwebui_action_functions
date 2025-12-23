@@ -1233,195 +1233,14 @@ class DocumentStyleExtractor:
 
         return self.styles
 
-    def _get_file_upload_modal(self, chat_msgs: List[Dict[str, Any]]) -> str:
-        """Generate JavaScript code to create a file upload modal (like prior.py approach)"""
-        import json
-        chat_msgs_json = json.dumps(chat_msgs)
 
-        return f"""
-            const overlay = document.createElement('div');
-            overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;`;
-            const modal = document.createElement('div');
-            modal.style.cssText = `background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 500px; width: 90%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 90vh; overflow-y: auto;`;
+class DocumentStyleApplier:
+    """Applies extracted styles to chat content in a new document."""
 
-            modal.innerHTML = `
-                <h2 style="margin-top: 0; color: #667eea; text-align: center; font-size: 24px; font-weight: 600;">📄 Document Style Formatter</h2>
-                <p style="color: #666; margin-bottom: 20px; text-align: center;">Upload a DOCX or PDF document to extract styling and format your chat content.</p>
-
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">Select Document:</label>
-                    <input type="file" id="docFormatterFileInput" accept=".docx,.pdf" style="width: 100%; padding: 12px; font-size: 14px; border: 2px solid #667eea; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">
-                </div>
-
-                <div id="docFormatterStatus" style="margin: 15px 0; padding: 12px; border-radius: 8px; display: none;"></div>
-
-                <div style="display: flex; justify-content: space-between; gap: 10px;">
-                    <button id="processBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px; font-weight: 600;">Process Document</button>
-                    <button id="cancelBtn" style="background: #f5f5f5; border: 1px solid #ddd; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px;">Cancel</button>
-                </div>
-            `;
-
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            // Store chat messages for later use
-            window.docFormatterChatMsgs = {chat_msgs_json};
-
-            const closeModal = () => {{
-                if (document.body.contains(overlay)) {{
-                    document.body.removeChild(overlay);
-                }}
-            }};
-
-            const showStatus = (message, isError = false) => {{
-                const statusDiv = document.getElementById('docFormatterStatus');
-                statusDiv.style.display = 'block';
-                statusDiv.style.background = isError ? '#fee' : '#efe';
-                statusDiv.style.color = isError ? '#c33' : '#3c3';
-                statusDiv.style.border = `1px solid ${{isError ? '#c33' : '#3c3'}}`;
-                statusDiv.textContent = message;
-                setTimeout(() => {{ statusDiv.style.display = 'none'; }}, 5000);
-            }};
-
-            // Handle file upload and processing
-            document.getElementById('processBtn').onclick = async () => {{
-                const fileInput = document.getElementById('docFormatterFileInput');
-                const statusDiv = document.getElementById('docFormatterStatus');
-
-                if (!fileInput.files || !fileInput.files[0]) {{
-                    showStatus('Please select a file first.', true);
-                    return;
-                }}
-
-                const file = fileInput.files[0];
-                showStatus('Processing file: ' + file.name + '...', false);
-
-                // Convert file to base64
-                const reader = new FileReader();
-                reader.onload = async function(e) {{
-                    const base64 = e.target.result.split(',')[1];
-
-                    try {{
-                        // Store file data and trigger action call via OpenWebUI's mechanism
-                        // We'll use the chat API to call the function with file data
-                        const actionData = {{
-                            file: base64,
-                            file_extension: '.' + file.name.split('.').pop().toLowerCase(),
-                            messages: window.docFormatterChatMsgs || []
-                        }};
-
-                        showStatus('Sending file to server...', false);
-
-                        // Try to call via OpenWebUI's chat/function API
-                        // First, try to find the chat ID from the current page
-                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
-                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
-                                       localStorage.getItem('lastChatId');
-
-                        // Try multiple API patterns
-                        const apiCalls = [];
-
-                        // Pattern 1: Direct action endpoint (if available)
-                        apiCalls.push(() => fetch('/api/chat/actions/output_to_document', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify(actionData)
-                        }}));
-
-                        // Pattern 2: Via chat API with function call
-                        if (chatId) {{
-                            apiCalls.push(() => fetch(`/api/v1/chats/${{chatId}}`, {{
-                                method: 'POST',
-                                headers: {{ 'Content-Type': 'application/json' }},
-                                body: JSON.stringify({{
-                                    messages: window.docFormatterChatMsgs || [],
-                                    functions: [{{
-                                        name: 'output_to_document',
-                                        arguments: JSON.stringify(actionData)
-                                    }}]
-                                }})
-                            }}));
-                        }}
-
-                        // Pattern 3: Generic action endpoint
-                        apiCalls.push(() => fetch('/api/v1/actions/output_to_document', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify(actionData)
-                        }}));
-
-                        let result = null;
-                        let lastError = 'All API endpoints failed';
-
-                        for (const apiCall of apiCalls) {{
-                            try {{
-                                const response = await apiCall();
-                                if (response.ok) {{
-                                    const data = await response.json();
-                                    // Check if response contains file data or success indicator
-                                    if (data.file || data.success || data.content) {{
-                                        result = data;
-                                        break;
-                                    }}
-                                }}
-                            }} catch (err) {{
-                                lastError = err.message;
-                                continue;
-                            }}
-                        }}
-
-                        if (result && (result.success || result.file)) {{
-                            showStatus('✓ Document formatted successfully!', false);
-                            if (result.file && result.file.content) {{
-                                // Trigger download
-                                const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = result.file.filename || 'formatted_chat.docx';
-                                document.body.appendChild(a);
-                                a.click();
-                                URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-                            }}
-                            setTimeout(() => closeModal(), 2000);
-                        }} else {{
-                            // Fallback: Show error but also log to console for debugging
-                            console.error('Action call failed:', lastError, 'Response:', result);
-                            showStatus('Error processing file. Check console (F12) for details. Error: ' + (result?.error || result?.content || lastError), true);
-                        }}
-                    }} catch (error) {{
-                        showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
-                        console.error('Document formatter error:', error);
-                    }}
-                }};
-                reader.readAsDataURL(file);
-            }};
-
-            document.getElementById('cancelBtn').onclick = closeModal;
-            overlay.onclick = (e) => {{ if (e.target === overlay) closeModal(); }};
-            overlay.onkeydown = (e) => {{ if (e.key === 'Escape') closeModal(); }};
-        """
-
-    def extract_from_pdf(self, pdf_path: str) -> Dict[str, Any]:
-        """Extract styles from a PDF file by converting to DOCX first."""
-        # Convert PDF to DOCX temporarily
-        temp_docx = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
-        temp_docx_path = temp_docx.name
-        temp_docx.close()
-
-        try:
-            cv = Converter(pdf_path)
-            cv.convert(temp_docx_path, start=0, end=None)
-            cv.close()
-
-            # Extract from converted DOCX
-            styles = self.extract_from_docx(temp_docx_path)
-            return styles
-        finally:
-            # Clean up temporary file
-            if os.path.exists(temp_docx_path):
-                os.unlink(temp_docx_path)
+    def __init__(self, styles: Dict[str, Any]):
+        self.styles = styles
+        self.doc = Document()
+        self._apply_document_settings()
 
     def _extract_paragraph_style(self, paragraph) -> Dict[str, Any]:
         """Extract style information from a paragraph."""
@@ -1616,6 +1435,164 @@ class Action:
     def __init__(self):
         """Initialize the Action with Valves configuration."""
         self.valves = self.Valves()
+
+    def _get_file_upload_modal(self, chat_msgs: List[Dict[str, Any]]) -> str:
+        """Generate JavaScript code to create a file upload modal (like prior.py approach)"""
+        import json
+        chat_msgs_json = json.dumps(chat_msgs)
+
+        return f"""
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;`;
+            const modal = document.createElement('div');
+            modal.style.cssText = `background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 500px; width: 90%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 90vh; overflow-y: auto;`;
+
+            modal.innerHTML = `
+                <h2 style="margin-top: 0; color: #667eea; text-align: center; font-size: 24px; font-weight: 600;">📄 Document Style Formatter</h2>
+                <p style="color: #666; margin-bottom: 20px; text-align: center;">Upload a DOCX or PDF document to extract styling and format your chat content.</p>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">Select Document:</label>
+                    <input type="file" id="docFormatterFileInput" accept=".docx,.pdf" style="width: 100%; padding: 12px; font-size: 14px; border: 2px solid #667eea; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">
+                </div>
+
+                <div id="docFormatterStatus" style="margin: 15px 0; padding: 12px; border-radius: 8px; display: none;"></div>
+
+                <div style="display: flex; justify-content: space-between; gap: 10px;">
+                    <button id="processBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px; font-weight: 600;">Process Document</button>
+                    <button id="cancelBtn" style="background: #f5f5f5; border: 1px solid #ddd; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px;">Cancel</button>
+                </div>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Store chat messages for later use
+            window.docFormatterChatMsgs = {chat_msgs_json};
+
+            const closeModal = () => {{
+                if (document.body.contains(overlay)) {{
+                    document.body.removeChild(overlay);
+                }}
+            }};
+
+            const showStatus = (message, isError = false) => {{
+                const statusDiv = document.getElementById('docFormatterStatus');
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = isError ? '#fee' : '#efe';
+                statusDiv.style.color = isError ? '#c33' : '#3c3';
+                statusDiv.style.border = `1px solid ${{isError ? '#c33' : '#3c3'}}`;
+                statusDiv.textContent = message;
+                setTimeout(() => {{ statusDiv.style.display = 'none'; }}, 5000);
+            }};
+
+            // Handle file upload and processing
+            document.getElementById('processBtn').onclick = async () => {{
+                const fileInput = document.getElementById('docFormatterFileInput');
+                const statusDiv = document.getElementById('docFormatterStatus');
+
+                if (!fileInput.files || !fileInput.files[0]) {{
+                    showStatus('Please select a file first.', true);
+                    return;
+                }}
+
+                const file = fileInput.files[0];
+                showStatus('Processing file: ' + file.name + '...', false);
+
+                // Convert file to base64
+                const reader = new FileReader();
+                reader.onload = async function(e) {{
+                    const base64 = e.target.result.split(',')[1];
+
+                    try {{
+                        const actionData = {{
+                            file: base64,
+                            file_extension: '.' + file.name.split('.').pop().toLowerCase(),
+                            messages: window.docFormatterChatMsgs || []
+                        }};
+
+                        showStatus('Sending file to server...', false);
+
+                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
+                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
+                                       localStorage.getItem('lastChatId');
+
+                        const apiCalls = [];
+                        apiCalls.push(() => fetch('/api/chat/actions/output_to_document', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(actionData)
+                        }}));
+
+                        if (chatId) {{
+                            apiCalls.push(() => fetch(`/api/v1/chats/${{chatId}}`, {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{
+                                    messages: window.docFormatterChatMsgs || [],
+                                    functions: [{{
+                                        name: 'output_to_document',
+                                        arguments: JSON.stringify(actionData)
+                                    }}]
+                                }})
+                            }}));
+                        }}
+
+                        apiCalls.push(() => fetch('/api/v1/actions/output_to_document', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(actionData)
+                        }}));
+
+                        let result = null;
+                        let lastError = 'All API endpoints failed';
+
+                        for (const apiCall of apiCalls) {{
+                            try {{
+                                const response = await apiCall();
+                                if (response.ok) {{
+                                    const data = await response.json();
+                                    if (data.file || data.success || data.content) {{
+                                        result = data;
+                                        break;
+                                    }}
+                                }}
+                            }} catch (err) {{
+                                lastError = err.message;
+                                continue;
+                            }}
+                        }}
+
+                        if (result && (result.success || result.file)) {{
+                            showStatus('✓ Document formatted successfully!', false);
+                            if (result.file && result.file.content) {{
+                                const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = result.file.filename || 'formatted_chat.docx';
+                                document.body.appendChild(a);
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                            }}
+                            setTimeout(() => closeModal(), 2000);
+                        }} else {{
+                            console.error('Action call failed:', lastError, 'Response:', result);
+                            showStatus('Error processing file. Check console (F12) for details. Error: ' + (result?.error || result?.content || lastError), true);
+                        }}
+                    }} catch (error) {{
+                        showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
+                        console.error('Document formatter error:', error);
+                    }}
+                }};
+                reader.readAsDataURL(file);
+            }};
+
+            document.getElementById('cancelBtn').onclick = closeModal;
+            overlay.onclick = (e) => {{ if (e.target === overlay) closeModal(); }};
+            overlay.onkeydown = (e) => {{ if (e.key === 'Escape') closeModal(); }};
+        """
 
     async def action(
         self,
