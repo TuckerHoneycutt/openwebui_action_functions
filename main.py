@@ -1497,46 +1497,58 @@ class Action:
         if __user__:
             merged_kwargs['__user__'] = __user__
 
-        # If no file provided, return HTML GUI
+        # If no file provided, use __event_call__ to prompt for file upload
         if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file'):
-            try:
-                gui_html = generate_modern_gui()
+            print("[DOC_FORMATTER] No file provided, prompting user for upload", file=sys.stderr)
 
-                # Get chat messages from context if available
-                chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
+            # Get chat messages from context
+            chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
 
-                # Return result with HTML - OpenWebUI expects "html" key or direct HTML string
-                chat_messages_json = json.dumps(chat_msgs)
-                gui_with_messages = gui_html.replace(
-                    '</body>',
-                    f'''<script>
-                        // Store chat messages for the GUI to access
-                        window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
-                        window.__DOC_FORMATTER_RESPONSE__ = {{
-                            _chat_messages: {chat_messages_json}
-                        }};
-                    </script>
-                    </body>'''
-                )
-
-                print(f"[DOC_FORMATTER] Returning GUI HTML (length: {len(gui_with_messages)})", file=sys.stderr)
-                # Try multiple return formats for OpenWebUI compatibility
-                # OpenWebUI may expect different formats - try returning HTML directly or in different keys
-                return {
-                    "html": gui_with_messages,
-                    "result": gui_with_messages,  # Some versions expect HTML in result
-                    "content": gui_with_messages,  # Alternative key
-                    "success": True
-                }
-            except Exception as e:
-                import traceback
-                error_msg = f"Error generating GUI: {str(e)}\n{traceback.format_exc()}"
+            # Use __event_call__ to prompt for file upload (OpenWebUI's proper way)
+            if __event_call__:
                 try:
-                    logger.error(error_msg)
-                except:
-                    pass
+                    print("[DOC_FORMATTER] Using __event_call__ to prompt for file", file=sys.stderr)
+                    # Prompt user for file upload
+                    file_response = await __event_call__({
+                        "type": "input",
+                        "data": {
+                            "title": "📄 Document Style Formatter",
+                            "message": "Please upload a DOCX or PDF document to extract styling from:",
+                            "input_type": "file",
+                            "accept": ".docx,.pdf",
+                            "required": True
+                        }
+                    })
+
+                    print(f"[DOC_FORMATTER] File response received: {type(file_response)}", file=sys.stderr)
+
+                    if file_response and 'file' in file_response:
+                        # Process the uploaded file
+                        file = file_response['file']
+                        print(f"[DOC_FORMATTER] File received, processing...", file=sys.stderr)
+                        # Continue to file processing below
+                    elif file_response:
+                        # File might be in different format
+                        file = file_response.get('file') or file_response.get('data') or file_response
+                        print(f"[DOC_FORMATTER] File extracted from response", file=sys.stderr)
+                    else:
+                        return {
+                            "content": "File upload cancelled or failed. Please try again.",
+                            "success": False
+                        }
+                except Exception as e:
+                    import traceback
+                    error_msg = f"Error in file upload prompt: {str(e)}\n{traceback.format_exc()}"
+                    print(f"[DOC_FORMATTER] ERROR in __event_call__: {error_msg}", file=sys.stderr)
+                    return {
+                        "content": f"Error prompting for file: {str(e)}\n\nPlease upload a DOCX or PDF document to format your chat content.",
+                        "success": False
+                    }
+            else:
+                # __event_call__ not available, return instructions
+                print("[DOC_FORMATTER] __event_call__ not available, returning instructions", file=sys.stderr)
                 return {
-                    "error": error_msg,
+                    "content": "📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document to extract styling and format your chat content.\n\nNote: File upload dialog not available. Please ensure OpenWebUI supports __event_call__ for file uploads.",
                     "success": False
                 }
 
