@@ -1601,45 +1601,62 @@ class Action:
 
                             // Try to find and trigger the action button programmatically
                             setTimeout(() => {{
-                                // Try multiple ways to find the action button
-                                const actionSelectors = [
-                                    '[data-action="output_to_document"]',
-                                    'button[onclick*="output_to_document"]',
-                                    '.action-button',
-                                    '[data-function="output_to_document"]'
-                                ];
-
                                 let actionButton = null;
-                                for (const selector of actionSelectors) {{
-                                    try {{
-                                        actionButton = document.querySelector(selector);
-                                        if (actionButton) break;
-                                    }} catch (e) {{
-                                        // Invalid selector, skip it
-                                        console.log('Invalid selector:', selector);
+
+                                // First, try to find buttons by iterating through all buttons
+                                // This is more reliable than CSS selectors
+                                const allButtons = document.querySelectorAll('button');
+                                for (const btn of allButtons) {{
+                                    // Check data attributes first (most reliable)
+                                    const dataAction = btn.getAttribute('data-action');
+                                    const dataFunction = btn.getAttribute('data-function');
+                                    if (dataAction === 'output_to_document' || dataFunction === 'output_to_document') {{
+                                        actionButton = btn;
+                                        console.log('Found action button by data attribute');
+                                        break;
+                                    }}
+
+                                    // Check onclick attribute
+                                    const onclick = btn.getAttribute('onclick');
+                                    if (onclick && onclick.includes('output_to_document')) {{
+                                        actionButton = btn;
+                                        console.log('Found action button by onclick attribute');
+                                        break;
+                                    }}
+
+                                    // Check class names
+                                    const className = btn.className || '';
+                                    if (className.includes('output_to_document') || className.includes('action-button')) {{
+                                        actionButton = btn;
+                                        console.log('Found action button by class name');
+                                        break;
+                                    }}
+
+                                    // Check text content (last resort)
+                                    const textContent = btn.textContent || btn.innerText || '';
+                                    if (textContent.includes('output_to_document')) {{
+                                        actionButton = btn;
+                                        console.log('Found action button by text content');
+                                        break;
                                     }}
                                 }}
 
-                                // Also try to find buttons by text content or attributes
+                                // If still not found, try safe CSS selectors
                                 if (!actionButton) {{
-                                    const allButtons = document.querySelectorAll('button');
-                                    for (const btn of allButtons) {{
-                                        // Check text content
-                                        if (btn.textContent && btn.textContent.includes('output_to_document')) {{
-                                            actionButton = btn;
-                                            break;
-                                        }}
-                                        // Check data attributes
-                                        if (btn.getAttribute('data-action') === 'output_to_document' ||
-                                            btn.getAttribute('data-function') === 'output_to_document') {{
-                                            actionButton = btn;
-                                            break;
-                                        }}
-                                        // Check onclick attribute
-                                        const onclick = btn.getAttribute('onclick');
-                                        if (onclick && onclick.includes('output_to_document')) {{
-                                            actionButton = btn;
-                                            break;
+                                    const safeSelectors = [
+                                        '[data-action="output_to_document"]',
+                                        '[data-function="output_to_document"]'
+                                    ];
+
+                                    for (const selector of safeSelectors) {{
+                                        try {{
+                                            actionButton = document.querySelector(selector);
+                                            if (actionButton) {{
+                                                console.log('Found action button by selector:', selector);
+                                                break;
+                                            }}
+                                        }} catch (e) {{
+                                            console.log('Error with selector:', selector, e);
                                         }}
                                     }}
                                 }}
