@@ -1585,90 +1585,90 @@ class Action:
             temp_input.close()
 
             try:
-            # Extract styles
-            extractor = DocumentStyleExtractor()
-            if file_ext == '.docx':
-                styles = extractor.extract_from_docx(temp_input_path)
-            elif file_ext == '.pdf':
-                styles = extractor.extract_from_pdf(temp_input_path)
+                # Extract styles
+                extractor = DocumentStyleExtractor()
+                if file_ext == '.docx':
+                    styles = extractor.extract_from_docx(temp_input_path)
+                elif file_ext == '.pdf':
+                    styles = extractor.extract_from_pdf(temp_input_path)
 
-            # Get chat messages from various possible sources
-            if chat_messages is None:
-                chat_messages = messages
+                # Get chat messages from various possible sources
+                if chat_messages is None:
+                    chat_messages = messages
 
-            if chat_messages is None:
-                # Try to get from merged_kwargs with various common names
-                chat_messages = (
-                    merged_kwargs.get('messages') or
-                    merged_kwargs.get('chat_messages') or
-                    merged_kwargs.get('chat_history') or
-                    merged_kwargs.get('history') or
-                    []
-                )
+                if chat_messages is None:
+                    # Try to get from merged_kwargs with various common names
+                    chat_messages = (
+                        merged_kwargs.get('messages') or
+                        merged_kwargs.get('chat_messages') or
+                        merged_kwargs.get('chat_history') or
+                        merged_kwargs.get('history') or
+                        []
+                    )
 
-            # Convert messages to standard format if needed
-            if chat_messages:
-                formatted_messages = []
-                for msg in chat_messages:
-                    if isinstance(msg, dict):
-                        # Ensure it has 'role' and 'content'
-                        role = msg.get('role', msg.get('from', 'user'))
-                        content = msg.get('content', msg.get('text', msg.get('message', '')))
-                        formatted_messages.append({'role': role, 'content': str(content)})
-                    elif isinstance(msg, str):
-                        # Plain string, assume it's user content
-                        formatted_messages.append({'role': 'user', 'content': msg})
-                chat_messages = formatted_messages
+                # Convert messages to standard format if needed
+                if chat_messages:
+                    formatted_messages = []
+                    for msg in chat_messages:
+                        if isinstance(msg, dict):
+                            # Ensure it has 'role' and 'content'
+                            role = msg.get('role', msg.get('from', 'user'))
+                            content = msg.get('content', msg.get('text', msg.get('message', '')))
+                            formatted_messages.append({'role': role, 'content': str(content)})
+                        elif isinstance(msg, str):
+                            # Plain string, assume it's user content
+                            formatted_messages.append({'role': 'user', 'content': msg})
+                    chat_messages = formatted_messages
 
-            if not chat_messages:
-                return {"error": "No chat messages found. Please ensure chat context is available."}
+                if not chat_messages:
+                    return {"error": "No chat messages found. Please ensure chat context is available."}
 
-            # Apply styles to chat content
-            applier = DocumentStyleApplier(styles)
-            applier.add_headers()
-            applier.add_chat_content(chat_messages)
-            applier.add_tables()
-            applier.add_footers()
+                # Apply styles to chat content
+                applier = DocumentStyleApplier(styles)
+                applier.add_headers()
+                applier.add_chat_content(chat_messages)
+                applier.add_tables()
+                applier.add_footers()
 
-            # Save output document
-            output_path = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
-            output_path.close()
+                # Save output document
+                output_path = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+                output_path.close()
 
-            applier.save(output_path.name)
+                applier.save(output_path.name)
 
-            # Read output file
-            with open(output_path.name, 'rb') as f:
-                output_bytes = f.read()
+                # Read output file
+                with open(output_path.name, 'rb') as f:
+                    output_bytes = f.read()
 
-            # Clean up temporary files
-            os.unlink(temp_input_path)
-            os.unlink(output_path.name)
+                # Clean up temporary files
+                os.unlink(temp_input_path)
+                os.unlink(output_path.name)
 
-            # Return result - OpenWebUI typically expects file data or download URL
-            return {
-                "success": True,
-                "message": "Document formatted successfully!",
-                "file": {
-                    "content": base64.b64encode(output_bytes).decode('utf-8'),
-                    "filename": "formatted_chat.docx",
-                    "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                },
-                "download_url": None  # Can be set if you have a file server
-            }
+                # Return result - OpenWebUI typically expects file data or download URL
+                return {
+                    "success": True,
+                    "message": "Document formatted successfully!",
+                    "file": {
+                        "content": base64.b64encode(output_bytes).decode('utf-8'),
+                        "filename": "formatted_chat.docx",
+                        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    },
+                    "download_url": None  # Can be set if you have a file server
+                }
 
-        except Exception as e:
-            # Clean up on error
-            if os.path.exists(temp_input_path):
-                try:
-                    os.unlink(temp_input_path)
-                except:
-                    pass
-            import traceback
-            return {
-                "error": f"Error processing document: {str(e)}",
-                "traceback": traceback.format_exc(),
-                "success": False
-            }
+            except Exception as e:
+                # Clean up on error
+                if os.path.exists(temp_input_path):
+                    try:
+                        os.unlink(temp_input_path)
+                    except:
+                        pass
+                import traceback
+                return {
+                    "error": f"Error processing document: {str(e)}",
+                    "traceback": traceback.format_exc(),
+                    "success": False
+                }
 
     except Exception as e:
         import traceback
