@@ -1670,13 +1670,13 @@ class Action:
                     "success": False
                 }
 
-    except Exception as e:
-        import traceback
-        return {
-            "error": f"Error processing document: {str(e)}",
-            "traceback": traceback.format_exc(),
-            "success": False
-        }
+        except Exception as e:
+            import traceback
+            return {
+                "error": f"Error processing document: {str(e)}",
+                "traceback": traceback.format_exc(),
+                "success": False
+            }
 
 
 # Example usage and testing
