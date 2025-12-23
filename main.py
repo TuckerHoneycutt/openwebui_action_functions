@@ -1516,39 +1516,163 @@ class Action:
                     try {{
                         showStatus('Sending file to server...', false);
 
-                        // Store file data in localStorage so it persists and can be accessed
-                        // when the action function is called again
+                        // Prepare file data
                         const fileData = {{
                             file: base64,
                             file_extension: '.' + file.name.split('.').pop().toLowerCase(),
-                            messages: window.docFormatterChatMsgs || [],
-                            timestamp: Date.now()
+                            messages: window.docFormatterChatMsgs || []
                         }};
 
+                        // Store in localStorage as backup
                         localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
                         window.docFormatterFileData = fileData;
 
-                        showStatus('File data stored. Please click the action button again to process.', false);
-                        console.log('File data stored in localStorage. Click action button to process.');
-                        console.log('File data:', {{
-                            file_extension: fileData.file_extension,
-                            messages_count: fileData.messages?.length || 0
-                        }});
+                        // Try to call the action function directly via the chat API
+                        // We'll inject the file data into the request body
+                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
+                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
+                                       localStorage.getItem('lastChatId');
 
-                        // Auto-close modal after showing message
-                        setTimeout(() => {{
-                            closeModal();
-                            // Show a notification that user should click the button
-                            const notification = document.createElement('div');
-                            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
-                            notification.textContent = '✓ File ready! Click the action button again to process.';
-                            document.body.appendChild(notification);
-                            setTimeout(() => {{
-                                if (document.body.contains(notification)) {{
-                                    document.body.removeChild(notification);
+                        // Try to trigger the action function with file data
+                        // We'll use a custom event or modify the action call
+                        let processed = false;
+
+                        // Method: Inject code that will intercept the next action call and add file data
+                        const injectFileDataScript = `
+                            (function() {{
+                                const originalActionCall = window.__openwebui_action_call__ || (() => {{}});
+                                window.__openwebui_action_call__ = function(actionName, body) {{
+                                    if (actionName === 'output_to_document' && !body.file) {{
+                                        const storedData = localStorage.getItem('docFormatterFileData');
+                                        if (storedData) {{
+                                            try {{
+                                                const fileData = JSON.parse(storedData);
+                                                body.file = fileData.file;
+                                                body.file_extension = fileData.file_extension;
+                                                body.messages = fileData.messages;
+                                                localStorage.removeItem('docFormatterFileData');
+                                            }} catch (e) {{
+                                                console.error('Error parsing stored file data:', e);
+                                            }}
+                                        }}
+                                    }}
+                                    return originalActionCall(actionName, body);
+                                }};
+                            }})();
+                        `;
+
+                        // Inject the script
+                        const script = document.createElement('script');
+                        script.textContent = injectFileDataScript;
+                        document.head.appendChild(script);
+
+                        // Try to call the action function via the chat API endpoint
+                        // This is the endpoint OpenWebUI uses internally
+                        try {{
+                            // Get the current chat context
+                            const currentMessages = window.docFormatterChatMsgs || [];
+
+                            // Format request similar to how OpenWebUI calls actions internally
+                            const actionRequest = {{
+                                file: fileData.file,
+                                file_extension: fileData.file_extension,
+                                messages: fileData.messages,
+                                chat_messages: fileData.messages,
+                                model: window.docFormatterModel || 'gpt-4',
+                                chat_id: chatId
+                            }};
+
+                            console.log('Calling action with file data:', {{
+                                has_file: !!actionRequest.file,
+                                file_length: actionRequest.file?.length || 0,
+                                file_extension: actionRequest.file_extension,
+                                messages_count: actionRequest.messages?.length || 0
+                            }});
+
+                            const response = await fetch('/api/chat/actions/output_to_document', {{
+                                method: 'POST',
+                                headers: {{
+                                    'Content-Type': 'application/json',
+                                }},
+                                body: JSON.stringify(actionRequest)
+                            }});
+
+                            console.log('Response status:', response.status, response.statusText);
+
+                            if (response.ok) {{
+                                const result = await response.json();
+                                console.log('Response result:', result);
+
+                                if (result && (result.success || result.file || result.content)) {{
+                                    processed = true;
+                                    showStatus('✓ Document formatted successfully!', false);
+
+                                    // Handle file download
+                                    if (result.file && result.file.content) {{
+                                        const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = result.file.filename || 'formatted_chat.docx';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                        document.body.removeChild(a);
+                                    }} else if (result.content && typeof result.content === 'string' && result.content.includes('base64')) {{
+                                        // Handle base64 content in result.content
+                                        try {{
+                                            const base64Match = result.content.match(/base64,([^"]+)/);
+                                            if (base64Match) {{
+                                                const blob = new Blob([atob(base64Match[1])], {{ type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = 'formatted_chat.docx';
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                URL.revokeObjectURL(url);
+                                                document.body.removeChild(a);
+                                            }}
+                                        }} catch (e) {{
+                                            console.error('Error handling content download:', e);
+                                        }}
+                                    }}
+
+                                    // Clear stored data
+                                    localStorage.removeItem('docFormatterFileData');
+                                    setTimeout(() => closeModal(), 2000);
+                                    return;
+                                }} else {{
+                                    console.log('Response OK but no file in result:', result);
                                 }}
-                            }}, 5000);
-                        }}, 2000);
+                            }} else {{
+                                const errorText = await response.text();
+                                console.error('API call failed:', response.status, errorText.substring(0, 500));
+                                showStatus('Server error: ' + response.status + '. Check console for details.', true);
+                            }}
+                        }} catch (err) {{
+                            console.error('API call error:', err);
+                            showStatus('Error calling server: ' + err.message, true);
+                        }}
+
+                        if (!processed) {{
+                            // If direct call didn't work, show instructions
+                            showStatus('File data prepared. Please click the action button again to process.', false);
+                            console.log('File data stored. Click action button to process.');
+
+                            setTimeout(() => {{
+                                closeModal();
+                                const notification = document.createElement('div');
+                                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
+                                notification.textContent = '✓ File ready! Click the action button again to process.';
+                                document.body.appendChild(notification);
+                                setTimeout(() => {{
+                                    if (document.body.contains(notification)) {{
+                                        document.body.removeChild(notification);
+                                    }}
+                                }}, 5000);
+                            }}, 2000);
+                        }}
                     }} catch (error) {{
                         showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
                         console.error('Document formatter error:', error);
