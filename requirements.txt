@@ -1,3 +1,7 @@
+# Required dependencies for Document Style Formatter
 python-docx>=1.1.0
 PyMuPDF>=1.23.0
 pdf2docx>=0.5.6
+
+# Note: openwebui should already be installed as part of OpenWebUI
+# If running standalone, install with: pip install open-webui

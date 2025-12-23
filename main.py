@@ -1,56 +1,119 @@
 """
-OpenWebUI Action Function: Document Style Formatter
-Extracts styling from uploaded DOCX/PDF documents and applies it to chat content.
-Features a modern, stylish GUI with animations and visual effects.
+title: Document Style Formatter
+author: OpenWebUI Community
+version: 1.0.0
+description: Extract styling from DOCX/PDF documents and apply it to chat content with a modern GUI interface
+required_open_webui_version: 0.5.0
+requirements: python-docx>=1.1.0,PyMuPDF>=1.23.0,pdf2docx>=0.5.6
+"""
 
-SETUP INSTRUCTIONS:
-1. Place this file (main.py) in your OpenWebUI functions directory:
-   - Default location: ~/.open-webui/functions/ (or your configured functions directory)
-   - Or: /app/functions/ if running in Docker
+"""
+IMPORT DEPENDENCIES
+===================
+This section handles all required dependencies for the action function.
 
-2. Install dependencies:
-   pip install python-docx PyMuPDF pdf2docx
+Required Dependencies:
+- python-docx: For DOCX file manipulation
+- pdf2docx: For PDF to DOCX conversion (includes PyMuPDF/fitz)
+- openwebui: For action decorator (usually pre-installed with OpenWebUI)
 
-3. Restart OpenWebUI or reload functions:
-   - Restart the OpenWebUI service
-   - Or use the functions reload feature in the UI
+Installation:
+    pip install python-docx PyMuPDF pdf2docx
 
-4. After restarting, the button "format_chat_with_document_style" should appear:
-   - After each chat message/response
-   - In the action buttons area of the chat interface
-   - Click it to open the document upload GUI
-
-5. If the button doesn't appear:
-   - Check that the file is in the correct functions directory
-   - Verify OpenWebUI has restarted
-   - Check OpenWebUI logs for any import errors
-   - Ensure all dependencies are installed
-   - The function name will appear as: "Format Chat With Document Style"
+The imports are structured to:
+1. Import standard library modules first
+2. Import third-party modules with error handling
+3. Provide clear error messages if dependencies are missing
+4. Verify dependencies on module load
 """
 
 import os
+import sys
 import tempfile
-from typing import Dict, List, Any, Optional
-from docx import Document
-from docx.shared import Pt, RGBColor
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.enum.section import WD_SECTION_START
-from pdf2docx import Converter
 import io
 import base64
 import json
 import uuid
+from typing import Dict, List, Any, Optional
 
+# Import OpenWebUI action decorator (optional - has fallback)
 try:
     from openwebui import action
 except ImportError:
-    # Fallback decorator if openwebui is not available
+    # Fallback decorator if openwebui is not available (for testing outside OpenWebUI)
     def action(name: str = None, description: str = None, **kwargs):
         def decorator(func):
             func._action_name = name or func.__name__
             func._action_description = description or func.__doc__
             return func
         return decorator
+
+# Import python-docx dependencies (REQUIRED)
+try:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+    from docx.enum.section import WD_SECTION_START
+except ImportError as e:
+    error_msg = (
+        "ERROR: Missing required dependency 'python-docx'. "
+        "Please install it with: pip install python-docx"
+    )
+    print(error_msg, file=sys.stderr)
+    raise ImportError(error_msg) from e
+
+# Import pdf2docx dependency (REQUIRED)
+# Note: pdf2docx internally uses PyMuPDF (fitz), so installing pdf2docx
+# will also install PyMuPDF as a dependency
+try:
+    from pdf2docx import Converter
+except ImportError as e:
+    error_msg = (
+        "ERROR: Missing required dependency 'pdf2docx'. "
+        "Please install it with: pip install pdf2docx"
+    )
+    print(error_msg, file=sys.stderr)
+    raise ImportError(error_msg) from e
+
+
+def verify_dependencies() -> Dict[str, bool]:
+    """
+    Verify that all required dependencies are installed.
+    Returns a dictionary with dependency names as keys and installation status as values.
+    """
+    dependencies = {
+        'python-docx': False,
+        'pdf2docx': False,
+        'openwebui': False
+    }
+
+    try:
+        import docx
+        dependencies['python-docx'] = True
+    except ImportError:
+        pass
+
+    try:
+        import pdf2docx
+        dependencies['pdf2docx'] = True
+    except ImportError:
+        pass
+
+    try:
+        import openwebui
+        dependencies['openwebui'] = True
+    except ImportError:
+        pass
+
+    return dependencies
+
+
+# Verify dependencies on import (but don't fail if optional ones are missing)
+_DEPS = verify_dependencies()
+if not _DEPS['python-docx']:
+    print("WARNING: python-docx is not installed. Install with: pip install python-docx", file=sys.stderr)
+if not _DEPS['pdf2docx']:
+    print("WARNING: pdf2docx is not installed. Install with: pip install pdf2docx", file=sys.stderr)
 
 
 def generate_modern_gui() -> str:
@@ -683,31 +746,31 @@ def generate_modern_gui() -> str:
                 if (responseData && Array.isArray(responseData)) {{
                     return responseData;
                 }}
-                
+
                 // Method 2: From window context
                 if (window.chatMessages) {{
                     return window.chatMessages;
                 }}
-                
+
                 // Method 3: From parent window
                 if (window.parent && window.parent.chatMessages) {{
                     return window.parent.chatMessages;
                 }}
-                
+
                 // Method 4: Try to access OpenWebUI's chat state
                 if (window.__OPENWEBUI_CHAT_MESSAGES__) {{
                     return window.__OPENWEBUI_CHAT_MESSAGES__;
                 }}
-                
+
                 // Method 5: Try to find messages in DOM (look for OpenWebUI message elements)
                 const chatElements = document.querySelectorAll('[data-message], .message, .chat-message, [class*="message"]');
                 if (chatElements.length > 0) {{
                     const messages = [];
                     chatElements.forEach(el => {{
-                        const role = el.getAttribute('data-role') || 
+                        const role = el.getAttribute('data-role') ||
                                    el.getAttribute('data-from') ||
-                                   (el.classList.contains('user') || el.querySelector('.user')) ? 'user' : 
-                                   (el.classList.contains('assistant') || el.querySelector('.assistant')) ? 'assistant' : 
+                                   (el.classList.contains('user') || el.querySelector('.user')) ? 'user' :
+                                   (el.classList.contains('assistant') || el.querySelector('.assistant')) ? 'assistant' :
                                    'user';
                         const contentEl = el.querySelector('.message-content, .content, [class*="content"]') || el;
                         const content = contentEl.textContent || contentEl.innerText || '';
@@ -719,10 +782,10 @@ def generate_modern_gui() -> str:
                         return messages;
                     }}
                 }}
-                
+
                 // Method 6: Try to get from localStorage or sessionStorage
                 try {{
-                    const stored = localStorage.getItem('openwebui_chat_messages') || 
+                    const stored = localStorage.getItem('openwebui_chat_messages') ||
                                  sessionStorage.getItem('openwebui_chat_messages');
                     if (stored) {{
                         return JSON.parse(stored);
@@ -730,7 +793,7 @@ def generate_modern_gui() -> str:
                 }} catch (e) {{
                     console.log('Could not parse stored messages:', e);
                 }}
-                
+
                 console.warn('Could not find chat messages. The formatted document may be empty.');
                 return [];
             }} catch (e) {{
@@ -738,7 +801,7 @@ def generate_modern_gui() -> str:
                 return [];
             }}
         }}
-        
+
         // Store function globally for use in processDocument
         window.getChatMessages = getChatMessages;
 
@@ -856,11 +919,11 @@ def generate_modern_gui() -> str:
                 updateProgress(20);
                 const chatMessages = await getChatMessages();
                 updateProgress(25);
-                
+
                 // Convert file to base64 for transmission
                 const fileBase64 = await fileToBase64(selectedFile);
                 updateProgress(35);
-                
+
                 // Try to call the action function through OpenWebUI's API
                 // OpenWebUI typically exposes actions through a specific endpoint
                 const actionName = 'format_chat_with_document_style';
@@ -870,11 +933,11 @@ def generate_modern_gui() -> str:
                     `/api/functions/${{actionName}}`,
                     window.location.origin + `/api/v1/actions/${{actionName}}`
                 ];
-                
+
                 let result = null;
                 let errorOccurred = false;
                 let lastError = null;
-                
+
                 for (const endpoint of apiEndpoints) {{
                     try {{
                         updateProgress(45);
@@ -890,9 +953,9 @@ def generate_modern_gui() -> str:
                                 chat_messages: chatMessages
                             }})
                         }});
-                        
+
                         updateProgress(65);
-                        
+
                         if (response.ok) {{
                             result = await response.json();
                             break;
@@ -999,21 +1062,21 @@ def generate_modern_gui() -> str:
                 }}, 300);
             }}
         }}
-        
+
         // Make function globally accessible
         window.closeDocFormatterModal_{gui_id} = closeModal_{gui_id};
-        
+
         // Also create alias for backward compatibility
         function closeModal() {{
             closeModal_{gui_id}();
         }}
-        
+
         // Store chat messages if available from response
         try {{
             // Try to get messages from parent response or context
             const responseElement = document.querySelector('[data-chat-messages], [data-messages]');
             if (responseElement) {{
-                const messagesData = responseElement.getAttribute('data-chat-messages') || 
+                const messagesData = responseElement.getAttribute('data-chat-messages') ||
                                    responseElement.getAttribute('data-messages');
                 if (messagesData) {{
                     window.__DOC_FORMATTER_CHAT_MESSAGES__ = JSON.parse(messagesData);
@@ -1022,10 +1085,10 @@ def generate_modern_gui() -> str:
         }} catch (e) {{
             console.log('Could not parse messages from DOM:', e);
         }}
-        
+
         // Initialize
         createParticles();
-        
+
         // Close on overlay click
         const overlayEl = document.getElementById('modalOverlay-{gui_id}');
         if (overlayEl) {{
@@ -1035,7 +1098,7 @@ def generate_modern_gui() -> str:
                 }}
             }});
         }}
-        
+
         // Store chat messages if passed in response
         if (typeof window.__DOC_FORMATTER_RESPONSE__ !== 'undefined') {{
             const response = window.__DOC_FORMATTER_RESPONSE__;
@@ -1392,23 +1455,23 @@ def format_chat_with_document_style(
     3. Extracts styling information from the document
     4. Formats the chat messages using the extracted styles
     5. Returns a formatted DOCX document
-    
+
     Args:
         file: Uploaded file object (DOCX or PDF) - can be file object, file path, or base64 string
         chat_messages: List of chat messages with 'role' and 'content' keys
         messages: Alternative parameter name for chat messages
         **kwargs: Additional parameters from OpenWebUI context (may include 'messages', 'chat_history', etc.)
-    
+
     Returns:
         Dictionary with GUI HTML (to show modal), download link, or file data
     """
     # If no file provided, return JavaScript to inject and show the GUI modal
     if file is None and not kwargs.get('uploaded_file') and not kwargs.get('file'):
         gui_html = generate_modern_gui()
-        
+
         # Get chat messages from context if available
         chat_msgs = messages or chat_messages or kwargs.get('messages', kwargs.get('chat_messages', kwargs.get('chat_history', [])))
-        
+
         # Return result with HTML that will be injected into the page
         # OpenWebUI will render HTML in the response
         # Also inject script to store chat messages
@@ -1424,7 +1487,7 @@ def format_chat_with_document_style(
             </script>
             </body>'''
         )
-        
+
         return {
             "result": "📄 Document Style Formatter - Upload a document to format your chat",
             "html": gui_with_messages,
@@ -1600,10 +1663,28 @@ def format_chat_with_document_style(
 # Example usage and testing
 if __name__ == "__main__":
     # Test the function
+    print("=" * 70)
     print("Document Style Formatter - OpenWebUI Action Function")
-    print("This function extracts styling from DOCX/PDF files and applies it to chat content.")
-    print("\nTo use in OpenWebUI:")
-    print("1. Place this file in your OpenWebUI functions directory")
-    print("2. The action will appear as a button after chat sessions")
-    print("3. Click the button and upload a DOCX or PDF document")
-    print("4. The chat content will be formatted using the document's styles")
+    print("=" * 70)
+    print("\nThis function extracts styling from DOCX/PDF files and applies it to chat content.")
+    print("\nSETUP:")
+    print("1. Place this file (main.py) in your OpenWebUI functions directory")
+    print("   - Default: ~/.open-webui/functions/")
+    print("   - Or: /app/functions/ (Docker)")
+    print("\n2. Install dependencies:")
+    print("   pip install python-docx PyMuPDF pdf2docx")
+    print("\n3. Restart OpenWebUI")
+    print("\n4. The button 'Format Chat With Document Style' will appear:")
+    print("   - After each chat message/response")
+    print("   - In the action buttons area")
+    print("\n5. Click the button to open the document upload GUI")
+    print("\n" + "=" * 70)
+
+    # Verify the action function is properly decorated
+    if hasattr(format_chat_with_document_style, '_action_name'):
+        print(f"\n✓ Action function registered: {format_chat_with_document_style._action_name}")
+    else:
+        print("\n⚠ Action function may not be properly registered")
+        print("  Make sure 'from openwebui import action' works in your environment")
+
+    print("\n" + "=" * 70)
