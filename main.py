@@ -2,6 +2,30 @@
 OpenWebUI Action Function: Document Style Formatter
 Extracts styling from uploaded DOCX/PDF documents and applies it to chat content.
 Features a modern, stylish GUI with animations and visual effects.
+
+SETUP INSTRUCTIONS:
+1. Place this file (main.py) in your OpenWebUI functions directory:
+   - Default location: ~/.open-webui/functions/ (or your configured functions directory)
+   - Or: /app/functions/ if running in Docker
+
+2. Install dependencies:
+   pip install python-docx PyMuPDF pdf2docx
+
+3. Restart OpenWebUI or reload functions:
+   - Restart the OpenWebUI service
+   - Or use the functions reload feature in the UI
+
+4. After restarting, the button "format_chat_with_document_style" should appear:
+   - After each chat message/response
+   - In the action buttons area of the chat interface
+   - Click it to open the document upload GUI
+
+5. If the button doesn't appear:
+   - Check that the file is in the correct functions directory
+   - Verify OpenWebUI has restarted
+   - Check OpenWebUI logs for any import errors
+   - Ensure all dependencies are installed
+   - The function name will appear as: "Format Chat With Document Style"
 """
 
 import os
@@ -597,10 +621,10 @@ def generate_modern_gui() -> str:
 <body>
     <div class="particles" id="particles"></div>
 
-    <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-overlay" id="modalOverlay-{gui_id}">
         <div class="modal-container">
             <div class="modal-header">
-                <button class="close-btn" onclick="closeModal()">×</button>
+                <button class="close-btn" onclick="window.closeDocFormatterModal_{gui_id}()">×</button>
                 <h1 class="modal-title">📄 Document Style Formatter</h1>
                 <p class="modal-subtitle">Transform your chat into a professionally styled document</p>
             </div>
@@ -641,7 +665,7 @@ def generate_modern_gui() -> str:
                     <button class="btn btn-primary" id="processBtn" onclick="processDocument()" disabled>
                         <span id="processBtnText">Process Document</span>
                     </button>
-                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-secondary" onclick="window.closeDocFormatterModal_{gui_id}()">Cancel</button>
                 </div>
             </div>
         </div>
@@ -652,18 +676,71 @@ def generate_modern_gui() -> str:
         let selectedFile = null;
 
         // Try to get chat messages from OpenWebUI context
-        try {{
-            // Access chat messages from various possible sources
-            if (typeof window !== 'undefined') {{
-                window.chatMessages = window.chatMessages ||
-                    (window.parent && window.parent.chatMessages) ||
-                    (window.opener && window.opener.chatMessages) ||
-                    [];
+        async function getChatMessages() {{
+            try {{
+                // Method 1: Check if messages were passed in the response data
+                const responseData = window.__DOC_FORMATTER_CHAT_MESSAGES__;
+                if (responseData && Array.isArray(responseData)) {{
+                    return responseData;
+                }}
+                
+                // Method 2: From window context
+                if (window.chatMessages) {{
+                    return window.chatMessages;
+                }}
+                
+                // Method 3: From parent window
+                if (window.parent && window.parent.chatMessages) {{
+                    return window.parent.chatMessages;
+                }}
+                
+                // Method 4: Try to access OpenWebUI's chat state
+                if (window.__OPENWEBUI_CHAT_MESSAGES__) {{
+                    return window.__OPENWEBUI_CHAT_MESSAGES__;
+                }}
+                
+                // Method 5: Try to find messages in DOM (look for OpenWebUI message elements)
+                const chatElements = document.querySelectorAll('[data-message], .message, .chat-message, [class*="message"]');
+                if (chatElements.length > 0) {{
+                    const messages = [];
+                    chatElements.forEach(el => {{
+                        const role = el.getAttribute('data-role') || 
+                                   el.getAttribute('data-from') ||
+                                   (el.classList.contains('user') || el.querySelector('.user')) ? 'user' : 
+                                   (el.classList.contains('assistant') || el.querySelector('.assistant')) ? 'assistant' : 
+                                   'user';
+                        const contentEl = el.querySelector('.message-content, .content, [class*="content"]') || el;
+                        const content = contentEl.textContent || contentEl.innerText || '';
+                        if (content.trim()) {{
+                            messages.push({{ role: role, content: content.trim() }});
+                        }}
+                    }});
+                    if (messages.length > 0) {{
+                        return messages;
+                    }}
+                }}
+                
+                // Method 6: Try to get from localStorage or sessionStorage
+                try {{
+                    const stored = localStorage.getItem('openwebui_chat_messages') || 
+                                 sessionStorage.getItem('openwebui_chat_messages');
+                    if (stored) {{
+                        return JSON.parse(stored);
+                    }}
+                }} catch (e) {{
+                    console.log('Could not parse stored messages:', e);
+                }}
+                
+                console.warn('Could not find chat messages. The formatted document may be empty.');
+                return [];
+            }} catch (e) {{
+                console.log('Could not access chat messages:', e);
+                return [];
             }}
-        }} catch (e) {{
-            console.log('Could not access chat messages:', e);
-            window.chatMessages = [];
         }}
+        
+        // Store function globally for use in processDocument
+        window.getChatMessages = getChatMessages;
 
         // Create animated particles
         function createParticles() {{
@@ -775,26 +852,33 @@ def generate_modern_gui() -> str:
                 setTimeout(() => updateProgress(50), 1000);
                 setTimeout(() => updateProgress(70), 1500);
 
-                // Call the OpenWebUI action function
-                // Convert file to base64 for transmission
+                // Get chat messages
                 updateProgress(20);
+                const chatMessages = await getChatMessages();
+                updateProgress(25);
+                
+                // Convert file to base64 for transmission
                 const fileBase64 = await fileToBase64(selectedFile);
-                updateProgress(30);
-
-                // Try multiple API endpoints for OpenWebUI compatibility
+                updateProgress(35);
+                
+                // Try to call the action function through OpenWebUI's API
+                // OpenWebUI typically exposes actions through a specific endpoint
+                const actionName = 'format_chat_with_document_style';
                 const apiEndpoints = [
-                    '/api/v1/actions/format_chat_with_document_style',
-                    '/api/actions/format_chat_with_document_style',
-                    window.location.pathname + '/format_chat_with_document_style'
+                    `/api/v1/actions/${{actionName}}`,
+                    `/api/actions/${{actionName}}`,
+                    `/api/functions/${{actionName}}`,
+                    window.location.origin + `/api/v1/actions/${{actionName}}`
                 ];
-
+                
                 let result = null;
                 let errorOccurred = false;
-
+                let lastError = null;
+                
                 for (const endpoint of apiEndpoints) {{
                     try {{
-                        updateProgress(40);
-                        const response = await fetch(window.location.origin + endpoint, {{
+                        updateProgress(45);
+                        const response = await fetch(endpoint, {{
                             method: 'POST',
                             headers: {{
                                 'Content-Type': 'application/json',
@@ -802,26 +886,44 @@ def generate_modern_gui() -> str:
                             body: JSON.stringify({{
                                 file: fileBase64,
                                 file_extension: '.' + selectedFile.name.split('.').pop().toLowerCase(),
-                                messages: window.chatMessages || [],
-                                chat_messages: window.chatMessages || []
+                                messages: chatMessages,
+                                chat_messages: chatMessages
                             }})
                         }});
-
-                        updateProgress(60);
-
+                        
+                        updateProgress(65);
+                        
                         if (response.ok) {{
                             result = await response.json();
                             break;
                         }} else {{
                             const errorData = await response.json().catch(() => ({{}}));
+                            lastError = errorData.error || `HTTP ${{response.status}}: ${{response.statusText}}`;
                             if (endpoint === apiEndpoints[apiEndpoints.length - 1]) {{
-                                throw new Error(errorData.error || 'Request failed');
+                                throw new Error(lastError);
                             }}
                         }}
                     }} catch (err) {{
+                        lastError = err.message;
                         if (endpoint === apiEndpoints[apiEndpoints.length - 1]) {{
                             errorOccurred = true;
-                            throw err;
+                            // If all API calls fail, try calling the function directly via window
+                            try {{
+                                if (window.__OPENWEBUI_CALL_ACTION__) {{
+                                    updateProgress(50);
+                                    result = await window.__OPENWEBUI_CALL_ACTION__(actionName, {{
+                                        file: fileBase64,
+                                        file_extension: '.' + selectedFile.name.split('.').pop().toLowerCase(),
+                                        messages: chatMessages,
+                                        chat_messages: chatMessages
+                                    }});
+                                    updateProgress(80);
+                                }} else {{
+                                    throw err;
+                                }}
+                            }} catch (fallbackErr) {{
+                                throw err;
+                            }}
                         }}
                     }}
                 }}
@@ -888,23 +990,59 @@ def generate_modern_gui() -> str:
             return new Blob([byteArray], {{ type: mimeType }});
         }}
 
-        function closeModal() {{
-            const overlay = document.getElementById('modalOverlay');
-            overlay.style.animation = 'fadeOut 0.3s ease';
-            setTimeout(() => {{
-                overlay.remove();
-            }}, 300);
+        function closeModal_{gui_id}() {{
+            const overlay = document.getElementById('modalOverlay-{gui_id}');
+            if (overlay) {{
+                overlay.style.animation = 'fadeOut 0.3s ease';
+                setTimeout(() => {{
+                    overlay.remove();
+                }}, 300);
+            }}
         }}
-
+        
+        // Make function globally accessible
+        window.closeDocFormatterModal_{gui_id} = closeModal_{gui_id};
+        
+        // Also create alias for backward compatibility
+        function closeModal() {{
+            closeModal_{gui_id}();
+        }}
+        
+        // Store chat messages if available from response
+        try {{
+            // Try to get messages from parent response or context
+            const responseElement = document.querySelector('[data-chat-messages], [data-messages]');
+            if (responseElement) {{
+                const messagesData = responseElement.getAttribute('data-chat-messages') || 
+                                   responseElement.getAttribute('data-messages');
+                if (messagesData) {{
+                    window.__DOC_FORMATTER_CHAT_MESSAGES__ = JSON.parse(messagesData);
+                }}
+            }}
+        }} catch (e) {{
+            console.log('Could not parse messages from DOM:', e);
+        }}
+        
         // Initialize
         createParticles();
-
+        
         // Close on overlay click
-        document.getElementById('modalOverlay').addEventListener('click', (e) => {{
-            if (e.target.id === 'modalOverlay') {{
-                closeModal();
+        const overlayEl = document.getElementById('modalOverlay-{gui_id}');
+        if (overlayEl) {{
+            overlayEl.addEventListener('click', (e) => {{
+                if (e.target.id === 'modalOverlay-{gui_id}') {{
+                    closeModal_{gui_id}();
+                }}
+            }});
+        }}
+        
+        // Store chat messages if passed in response
+        if (typeof window.__DOC_FORMATTER_RESPONSE__ !== 'undefined') {{
+            const response = window.__DOC_FORMATTER_RESPONSE__;
+            if (response._chat_messages) {{
+                window.__DOC_FORMATTER_CHAT_MESSAGES__ = response._chat_messages;
             }}
-        }});
+        }}
     </script>
 </body>
 </html>
@@ -1235,49 +1373,63 @@ class DocumentStyleApplier:
 
 @action(
     name="format_chat_with_document_style",
-    description="Upload a DOCX or PDF document to extract its styling, then format the chat content using those styles.",
+    description="Format your chat content using styling from an uploaded DOCX or PDF document. Click to open the upload interface.",
     parameters={
         "type": "object",
-        "properties": {
-            "show_gui": {
-                "type": "boolean",
-                "description": "Set to true to show the GUI interface"
-            }
-        }
+        "properties": {}
     }
 )
 def format_chat_with_document_style(
     file: Any = None,
     chat_messages: List[Dict[str, str]] = None,
     messages: List[Dict[str, str]] = None,
-    show_gui: bool = False,
     **kwargs
 ) -> Dict[str, Any]:
     """
     OpenWebUI action function that:
-    1. Shows a modern GUI interface when first called
+    1. Shows a modern GUI interface when first called (button click)
     2. Accepts a document upload (DOCX or PDF)
     3. Extracts styling information from the document
     4. Formats the chat messages using the extracted styles
     5. Returns a formatted DOCX document
-
+    
     Args:
         file: Uploaded file object (DOCX or PDF) - can be file object, file path, or base64 string
         chat_messages: List of chat messages with 'role' and 'content' keys
         messages: Alternative parameter name for chat messages
-        show_gui: If True, returns the GUI HTML interface
         **kwargs: Additional parameters from OpenWebUI context (may include 'messages', 'chat_history', etc.)
-
+    
     Returns:
-        Dictionary with GUI HTML, download link, or file data
+        Dictionary with GUI HTML (to show modal), download link, or file data
     """
-    # If show_gui is True or no file provided, return the GUI
-    if show_gui or (file is None and not kwargs.get('uploaded_file') and not kwargs.get('file')):
+    # If no file provided, return JavaScript to inject and show the GUI modal
+    if file is None and not kwargs.get('uploaded_file') and not kwargs.get('file'):
         gui_html = generate_modern_gui()
+        
+        # Get chat messages from context if available
+        chat_msgs = messages or chat_messages or kwargs.get('messages', kwargs.get('chat_messages', kwargs.get('chat_history', [])))
+        
+        # Return result with HTML that will be injected into the page
+        # OpenWebUI will render HTML in the response
+        # Also inject script to store chat messages
+        chat_messages_json = json.dumps(chat_msgs)
+        gui_with_messages = gui_html.replace(
+            '</body>',
+            f'''<script>
+                // Store chat messages for the GUI to access
+                window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
+                window.__DOC_FORMATTER_RESPONSE__ = {{
+                    _chat_messages: {chat_messages_json}
+                }};
+            </script>
+            </body>'''
+        )
+        
         return {
-            "type": "html",
-            "content": gui_html,
-            "success": True
+            "result": "📄 Document Style Formatter - Upload a document to format your chat",
+            "html": gui_with_messages,
+            "success": True,
+            "_chat_messages": chat_msgs  # Store messages for JavaScript access
         }
 
     try:
