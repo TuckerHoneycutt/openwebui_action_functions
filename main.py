@@ -1578,7 +1578,8 @@ class Action:
 
                         if file:
                             print(f"[DOC_FORMATTER] File extracted successfully, type: {type(file)}", file=sys.stderr)
-                            # Continue to file processing below
+                            # File extracted, will continue to file processing below after this if block ends
+                            # Note: Execution will continue to line 1683 after exiting this if block
                         else:
                             print(f"[DOC_FORMATTER] No file found in response. Response type: {type(file_response)}, Value: {file_response}", file=sys.stderr)
                             return {
@@ -1680,6 +1681,8 @@ async function handleFileUpload() {{
                         "success": False
                     }
 
+        # File processing section - reached if file was provided or extracted above
+        print(f"[DOC_FORMATTER] Starting file processing. File is None: {file is None}", file=sys.stderr)
         try:
             # Handle file upload - support multiple formats
             file_content = None
