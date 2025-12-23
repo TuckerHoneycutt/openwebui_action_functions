@@ -1442,6 +1442,8 @@ class Action:
         chat_msgs_json = json.dumps(chat_msgs)
 
         return f"""
+            // Store chat messages globally for use when processing
+            window.docFormatterChatMsgs = {chat_msgs_json};
             const overlay = document.createElement('div');
             overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;`;
             const modal = document.createElement('div');
@@ -1537,27 +1539,64 @@ class Action:
                         // We'll use a custom event or modify the action call
                         let processed = false;
 
-                        // Method: Inject code that will intercept the next action call and add file data
+                        // Inject code that will intercept fetch calls to add file data
+                        // This will modify any fetch call to the action endpoint to include file data
                         const injectFileDataScript = `
                             (function() {{
-                                const originalActionCall = window.__openwebui_action_call__ || (() => {{}});
-                                window.__openwebui_action_call__ = function(actionName, body) {{
-                                    if (actionName === 'output_to_document' && !body.file) {{
-                                        const storedData = localStorage.getItem('docFormatterFileData');
-                                        if (storedData) {{
-                                            try {{
-                                                const fileData = JSON.parse(storedData);
-                                                body.file = fileData.file;
-                                                body.file_extension = fileData.file_extension;
-                                                body.messages = fileData.messages;
+                                const storedData = localStorage.getItem('docFormatterFileData');
+                                if (!storedData) return;
+
+                                try {{
+                                    const fileData = JSON.parse(storedData);
+
+                                    // Intercept fetch calls
+                                    const originalFetch = window.fetch;
+                                    window.fetch = function(...args) {{
+                                        const url = args[0];
+                                        const options = args[1] || {{}};
+
+                                        // Check if this is a call to our action endpoint
+                                        if (typeof url === 'string' && url.includes('output_to_document')) {{
+                                            console.log('Intercepting action call, adding file data');
+
+                                            // Modify request body to include file data
+                                            if (options.body) {{
+                                                try {{
+                                                    const body = JSON.parse(options.body);
+                                                    if (!body.file) {{
+                                                        body.file = fileData.file;
+                                                        body.file_extension = fileData.file_extension;
+                                                        body.messages = fileData.messages;
+                                                        body.chat_messages = fileData.messages;
+                                                        options.body = JSON.stringify(body);
+                                                        console.log('File data injected into request');
+                                                        localStorage.removeItem('docFormatterFileData');
+                                                    }}
+                                                }} catch (e) {{
+                                                    console.error('Error modifying request body:', e);
+                                                }}
+                                            }} else {{
+                                                // Create body with file data
+                                                options.body = JSON.stringify({{
+                                                    file: fileData.file,
+                                                    file_extension: fileData.file_extension,
+                                                    messages: fileData.messages,
+                                                    chat_messages: fileData.messages
+                                                }});
+                                                options.headers = options.headers || {{}};
+                                                options.headers['Content-Type'] = 'application/json';
+                                                console.log('Created new request body with file data');
                                                 localStorage.removeItem('docFormatterFileData');
-                                            }} catch (e) {{
-                                                console.error('Error parsing stored file data:', e);
                                             }}
                                         }}
-                                    }}
-                                    return originalActionCall(actionName, body);
-                                }};
+
+                                        return originalFetch.apply(this, args);
+                                    }};
+
+                                    console.log('File data interceptor installed');
+                                }} catch (e) {{
+                                    console.error('Error setting up file data interceptor:', e);
+                                }}
                             }})();
                         `;
 
@@ -1565,6 +1604,7 @@ class Action:
                         const script = document.createElement('script');
                         script.textContent = injectFileDataScript;
                         document.head.appendChild(script);
+                        console.log('File data interceptor script injected');
 
                         // Try to call the action function via the chat API endpoint
                         // This is the endpoint OpenWebUI uses internally
@@ -1730,6 +1770,16 @@ class Action:
         file = body.get('file')
         chat_messages = body.get('chat_messages')
         messages = body.get('messages')
+
+        # Debug: log all body keys to see what we're receiving
+        print(f"[DOC_FORMATTER] Body keys: {list(body.keys())}", file=sys.stderr)
+        print(f"[DOC_FORMATTER] File in body: {file is not None}", file=sys.stderr)
+        if file:
+            print(f"[DOC_FORMATTER] File type: {type(file)}, length: {len(str(file)) if isinstance(file, str) else 'N/A'}", file=sys.stderr)
+
+        # Check for file in various other possible locations
+        if file is None:
+            file = body.get('file_data') or body.get('uploaded_file')
 
         # Check if this is a function call with arguments (from JavaScript)
         if file is None and 'arguments' in body:
