@@ -1508,32 +1508,87 @@ class Action:
             if __event_call__:
                 try:
                     print("[DOC_FORMATTER] Using __event_call__ to prompt for file", file=sys.stderr)
-                    # Prompt user for file upload
-                    file_response = await __event_call__({
-                        "type": "input",
-                        "data": {
-                            "title": "📄 Document Style Formatter",
-                            "message": "Please upload a DOCX or PDF document to extract styling from:",
-                            "input_type": "file",
-                            "accept": ".docx,.pdf",
-                            "required": True
-                        }
-                    })
 
-                    print(f"[DOC_FORMATTER] File response received: {type(file_response)}", file=sys.stderr)
+                    # Try different formats for file upload prompt
+                    # Format 1: Direct file input
+                    try:
+                        file_response = await __event_call__({
+                            "type": "file",
+                            "data": {
+                                "title": "📄 Document Style Formatter",
+                                "message": "Please upload a DOCX or PDF document to extract styling from:",
+                                "accept": ".docx,.pdf",
+                                "required": True
+                            }
+                        })
+                        print(f"[DOC_FORMATTER] File response (type=file): {type(file_response)}", file=sys.stderr)
+                    except:
+                        # Format 2: Input with file type
+                        try:
+                            file_response = await __event_call__({
+                                "type": "input",
+                                "data": {
+                                    "title": "📄 Document Style Formatter",
+                                    "message": "Please upload a DOCX or PDF document:",
+                                    "type": "file",
+                                    "accept": ".docx,.pdf",
+                                    "required": True
+                                }
+                            })
+                            print(f"[DOC_FORMATTER] File response (input type=file): {type(file_response)}", file=sys.stderr)
+                        except:
+                            # Format 3: File upload dialog
+                            file_response = await __event_call__({
+                                "type": "file_upload",
+                                "data": {
+                                    "title": "📄 Document Style Formatter",
+                                    "description": "Please select a DOCX or PDF document to extract styling from:",
+                                    "accept": ".docx,.pdf",
+                                    "multiple": False
+                                }
+                            })
+                            print(f"[DOC_FORMATTER] File response (file_upload): {type(file_response)}", file=sys.stderr)
 
-                    if file_response and 'file' in file_response:
-                        # Process the uploaded file
-                        file = file_response['file']
-                        print(f"[DOC_FORMATTER] File received, processing...", file=sys.stderr)
-                        # Continue to file processing below
-                    elif file_response:
-                        # File might be in different format
-                        file = file_response.get('file') or file_response.get('data') or file_response
-                        print(f"[DOC_FORMATTER] File extracted from response", file=sys.stderr)
+                    print(f"[DOC_FORMATTER] File response content: {str(file_response)[:500]}", file=sys.stderr)
+                    print(f"[DOC_FORMATTER] File response type: {type(file_response)}", file=sys.stderr)
+
+                    # Extract file from response (try multiple possible formats)
+                    file = None
+                    if file_response:
+                        if isinstance(file_response, dict):
+                            file = file_response.get('file') or file_response.get('data') or file_response.get('content') or file_response.get('file_data')
+                            if not file:
+                                # Try to find file in nested structure
+                                for key in ['file', 'data', 'content', 'upload', 'file_data']:
+                                    if key in file_response:
+                                        file = file_response[key]
+                                        break
+                        elif isinstance(file_response, (str, bytes)):
+                            file = file_response
+                        elif isinstance(file_response, bool):
+                            # Boolean response means cancelled or not available
+                            print(f"[DOC_FORMATTER] Boolean response received: {file_response}", file=sys.stderr)
+                            return {
+                                "content": "File upload was cancelled or not available. Please try again.",
+                                "success": False
+                            }
+                        else:
+                            # Try to use response directly
+                            file = file_response
+
+                        if file:
+                            print(f"[DOC_FORMATTER] File extracted successfully, type: {type(file)}", file=sys.stderr)
+                            # Continue to file processing below
+                        else:
+                            print(f"[DOC_FORMATTER] No file found in response. Response type: {type(file_response)}, Value: {file_response}", file=sys.stderr)
+                            return {
+                                "content": "File upload cancelled or file not found in response. Please try again.",
+                                "success": False
+                            }
                     else:
+                        print(f"[DOC_FORMATTER] Empty or False file_response", file=sys.stderr)
                         return {
-                            "content": "File upload cancelled or failed. Please try again.",
+                            "content": "File upload cancelled. Please try again.",
                             "success": False
                         }
                 except Exception as e:
@@ -1541,16 +1596,89 @@ class Action:
                     error_msg = f"Error in file upload prompt: {str(e)}\n{traceback.format_exc()}"
                     print(f"[DOC_FORMATTER] ERROR in __event_call__: {error_msg}", file=sys.stderr)
                     return {
-                        "content": f"Error prompting for file: {str(e)}\n\nPlease upload a DOCX or PDF document to format your chat content.",
+                        "content": f"Error prompting for file: {str(e)}\n\nPlease try uploading the file again or contact support if the issue persists.",
                         "success": False
                     }
             else:
-                # __event_call__ not available, return instructions
-                print("[DOC_FORMATTER] __event_call__ not available, returning instructions", file=sys.stderr)
-                return {
-                    "content": "📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document to extract styling and format your chat content.\n\nNote: File upload dialog not available. Please ensure OpenWebUI supports __event_call__ for file uploads.",
-                    "success": False
-                }
+                # __event_call__ not available, return HTML with file input
+                print("[DOC_FORMATTER] __event_call__ not available, returning HTML file input", file=sys.stderr)
+                try:
+                    # Generate a simple HTML file input form
+                    file_input_html = f'''
+<div style="padding: 20px; border: 2px dashed #667eea; border-radius: 12px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
+    <h3 style="color: #667eea; margin-top: 0;">📄 Document Style Formatter</h3>
+    <p>Please upload a DOCX or PDF document to extract styling from:</p>
+    <input type="file" id="docFormatterFileInput" accept=".docx,.pdf" style="padding: 10px; border: 2px solid #667eea; border-radius: 8px; width: 100%; max-width: 400px;">
+    <br><br>
+    <button onclick="handleFileUpload()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+        Process Document
+    </button>
+    <div id="docFormatterStatus" style="margin-top: 15px;"></div>
+</div>
+
+<script>
+async function handleFileUpload() {{
+    const fileInput = document.getElementById('docFormatterFileInput');
+    const statusDiv = document.getElementById('docFormatterStatus');
+
+    if (!fileInput.files || !fileInput.files[0]) {{
+        statusDiv.innerHTML = '<p style="color: red;">Please select a file first.</p>';
+        return;
+    }}
+
+    const file = fileInput.files[0];
+    statusDiv.innerHTML = '<p style="color: #667eea;">Processing file: ' + file.name + '...</p>';
+
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onload = async function(e) {{
+        const base64 = e.target.result.split(',')[1];
+
+        // Call the action function again with the file
+        try {{
+            const response = await fetch('/api/chat/actions/output_to_document', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{
+                    file: base64,
+                    file_extension: '.' + file.name.split('.').pop().toLowerCase(),
+                    messages: {json.dumps(chat_msgs)}
+                }})
+            }});
+
+            const result = await response.json();
+            if (result.success) {{
+                statusDiv.innerHTML = '<p style="color: green;">✓ Document formatted successfully! Check downloads.</p>';
+                if (result.file && result.file.content) {{
+                    // Trigger download
+                    const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type }});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = result.file.filename || 'formatted_chat.docx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }}
+            }} else {{
+                statusDiv.innerHTML = '<p style="color: red;">Error: ' + (result.error || 'Unknown error') + '</p>';
+            }}
+        }} catch (error) {{
+            statusDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        }}
+    }};
+    reader.readAsDataURL(file);
+}}
+</script>
+'''
+                    return {
+                        "content": file_input_html,
+                        "html": file_input_html
+                    }
+                except Exception as e:
+                    return {
+                        "content": f"📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document.\n\nError: {str(e)}",
+                        "success": False
+                    }
 
         try:
             # Handle file upload - support multiple formats
