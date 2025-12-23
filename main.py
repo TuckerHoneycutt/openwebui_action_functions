@@ -1630,7 +1630,6 @@ class Action:
                                 }}
                             }}, 500);
                         }}, 500);
-                        }}, 500);
                     }} catch (error) {{
                         showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
                         console.error('Document formatter error:', error);
