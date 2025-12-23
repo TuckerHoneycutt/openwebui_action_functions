@@ -1508,8 +1508,8 @@ class Action:
             # Go directly to HTML file input which works properly
             print("[DOC_FORMATTER] Using HTML file input (skipping __event_call__ to avoid text input)", file=sys.stderr)
             try:
-                    # Generate a simple HTML file input form
-                    file_input_html = f'''
+                # Generate a simple HTML file input form
+                file_input_html = f'''
 <div style="padding: 20px; border: 2px dashed #667eea; border-radius: 12px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
     <h3 style="color: #667eea; margin-top: 0;">📄 Document Style Formatter</h3>
     <p>Please upload a DOCX or PDF document to extract styling from:</p>
@@ -1575,15 +1575,15 @@ async function handleFileUpload() {{
 }}
 </script>
 '''
-                    return {
-                        "content": file_input_html,
-                        "html": file_input_html
-                    }
-                except Exception as e:
-                    return {
-                        "content": f"📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document.\n\nError: {str(e)}",
-                        "success": False
-                    }
+                return {
+                    "content": file_input_html,
+                    "html": file_input_html
+                }
+            except Exception as e:
+                return {
+                    "content": f"📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document.\n\nError: {str(e)}",
+                    "success": False
+                }
 
         # File processing section - reached if file was provided or extracted above
         print(f"[DOC_FORMATTER] Starting file processing. File is None: {file is None}", file=sys.stderr)
