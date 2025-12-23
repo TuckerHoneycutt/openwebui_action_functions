@@ -4,7 +4,7 @@ author: OpenWebUI Community
 version: 1.0.0
 description: Extract styling from DOCX/PDF documents and apply it to chat content with a modern GUI interface
 required_open_webui_version: 0.5.0
-requirements: python-docx>=1.1.0,PyMuPDF>=1.23.0,pdf2docx>=0.5.6
+requirements: python-docx>=1.1.0,PyMuPDF>=1.23.0,pdf2docx>=0.5.6,pydantic>=2.0.0
 """
 
 """
@@ -36,13 +36,16 @@ import json
 import uuid
 from typing import Dict, List, Any, Optional
 
-# Import Pydantic for Valves class
+# Import Pydantic for Valves class (REQUIRED for OpenWebUI Action structure)
 try:
     from pydantic import BaseModel
-except ImportError:
-    # Fallback BaseModel if pydantic is not available
-    class BaseModel:
-        pass
+except ImportError as e:
+    error_msg = (
+        "ERROR: Missing required dependency 'pydantic'. "
+        "Please install it with: pip install pydantic"
+    )
+    print(error_msg, file=sys.stderr)
+    raise ImportError(error_msg) from e
 
 # Import python-docx dependencies (REQUIRED)
 try:
@@ -1444,7 +1447,13 @@ class Action:
         """Initialize the Action with Valves configuration."""
         self.valves = self.Valves()
 
-    async def action(self, body: dict, **kwargs) -> Optional[dict]:
+    async def action(
+        self,
+        body: Dict[str, Any],
+        __user__: Optional[Dict[str, Any]] = None,
+        __event_emitter__: Optional[Any] = None,
+        __event_call__: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         OpenWebUI action method that:
         1. Shows a modern GUI interface when first called (button click)
@@ -1458,7 +1467,9 @@ class Action:
                 - file: Uploaded file object (DOCX or PDF) - can be file object, file path, or base64 string
                 - chat_messages: List of chat messages with 'role' and 'content' keys
                 - messages: Alternative parameter name for chat messages
-            **kwargs: Additional parameters from OpenWebUI context (may include 'messages', 'chat_history', etc.)
+            __user__: Optional dictionary with user information
+            __event_emitter__: Optional function to send real-time updates to the frontend
+            __event_call__: Optional function for bidirectional communication (requesting user input)
 
         Returns:
             Dictionary with GUI HTML (to show modal), download link, or file data
@@ -1468,31 +1479,33 @@ class Action:
         chat_messages = body.get('chat_messages')
         messages = body.get('messages')
 
-        # Merge body and kwargs for backward compatibility
-        merged_kwargs = {**body, **kwargs}
+        # Merge body with all available context
+        merged_kwargs = {**body}
+        if __user__:
+            merged_kwargs['__user__'] = __user__
 
         # If no file provided, return JavaScript to inject and show the GUI modal
         if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file'):
-        gui_html = generate_modern_gui()
+            gui_html = generate_modern_gui()
 
             # Get chat messages from context if available
             chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
 
-        # Return result with HTML that will be injected into the page
-        # OpenWebUI will render HTML in the response
-        # Also inject script to store chat messages
-        chat_messages_json = json.dumps(chat_msgs)
-        gui_with_messages = gui_html.replace(
-            '</body>',
-            f'''<script>
-                // Store chat messages for the GUI to access
-                window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
-                window.__DOC_FORMATTER_RESPONSE__ = {{
-                    _chat_messages: {chat_messages_json}
-                }};
-            </script>
-            </body>'''
-        )
+            # Return result with HTML that will be injected into the page
+            # OpenWebUI will render HTML in the response
+            # Also inject script to store chat messages
+            chat_messages_json = json.dumps(chat_msgs)
+            gui_with_messages = gui_html.replace(
+                '</body>',
+                f'''<script>
+                    // Store chat messages for the GUI to access
+                    window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
+                    window.__DOC_FORMATTER_RESPONSE__ = {{
+                        _chat_messages: {chat_messages_json}
+                    }};
+                </script>
+                </body>'''
+            )
 
             return {
                 "result": "📄 Document Style Formatter - Upload a document to format your chat",
