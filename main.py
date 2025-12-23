@@ -1489,12 +1489,21 @@ class Action:
 
             const showStatus = (message, isError = false) => {{
                 const statusDiv = document.getElementById('docFormatterStatus');
+                if (!statusDiv) {{
+                    // Element doesn't exist (modal might be closed), just log to console
+                    console.log(isError ? '[ERROR]' : '[INFO]', message);
+                    return;
+                }}
                 statusDiv.style.display = 'block';
                 statusDiv.style.background = isError ? '#fee' : '#efe';
                 statusDiv.style.color = isError ? '#c33' : '#3c3';
                 statusDiv.style.border = `1px solid ${{isError ? '#c33' : '#3c3'}}`;
                 statusDiv.textContent = message;
-                setTimeout(() => {{ statusDiv.style.display = 'none'; }}, 5000);
+                setTimeout(() => {{
+                    if (statusDiv && document.body.contains(statusDiv)) {{
+                        statusDiv.style.display = 'none';
+                    }}
+                }}, 5000);
             }};
 
             // Handle file upload and processing
@@ -1529,27 +1538,29 @@ class Action:
                         window.docFormatterFileData = fileData;
                         localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
 
-                        // Close modal
-                        closeModal();
+                        // Show status before closing modal
+                        showStatus('File data prepared. Processing...', false);
 
-                        // Trigger the action function call with file data
-                        // We'll use __event_call__ mechanism by creating a custom event
-                        // that will be caught by OpenWebUI's action system
-                        showStatus('Calling action function with file data...', false);
-
-                        // Create a custom event to trigger action processing
-                        // This simulates clicking the action button but with file data included
-                        const actionEvent = new CustomEvent('openwebui:action:call', {{
-                            detail: {{
-                                action: 'output_to_document',
-                                data: fileData
-                            }}
-                        }});
-                        document.dispatchEvent(actionEvent);
-
-                        // Also try to find and trigger the action button programmatically
-                        // Look for action buttons and simulate a click
+                        // Close modal after a brief delay to show status
                         setTimeout(() => {{
+                            closeModal();
+
+                            // Trigger the action function call with file data after modal closes
+                            console.log('Preparing to trigger action function with file data');
+
+                            // Create a custom event to trigger action processing
+                            // This simulates clicking the action button but with file data included
+                            const actionEvent = new CustomEvent('openwebui:action:call', {{
+                                detail: {{
+                                    action: 'output_to_document',
+                                    data: fileData
+                                }}
+                            }});
+                            document.dispatchEvent(actionEvent);
+
+                            // Also try to find and trigger the action button programmatically
+                            // Look for action buttons and simulate a click
+                            setTimeout(() => {{
                             // Try multiple ways to find the action button
                             const actionSelectors = [
                                 '[data-action="output_to_document"]',
