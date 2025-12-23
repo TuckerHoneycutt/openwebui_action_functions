@@ -1,17 +1,9 @@
-2025-12-23 19:03:11.888 | INFO     | function_output_to_document:action:1529 - Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id'] - {}
-
 [DOC_FORMATTER] Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
 [DOC_FORMATTER] Body content preview: {'model': 'gpt-oss:20b', 'messages': [{'id': '6c665d55-ffba-4c45-a8d5-5f7260c0f861', 'role': 'user', 'content': 'Write me an appropriate HR policy for AI usage when dealing with potentially CUI usage'
 
-[DOC_FORMATTER] Returning GUI HTML (length: 53440)
+2025-12-23 19:08:44.797 | INFO     | function_output_to_document:action:1530 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '6c665d55-ffba-4c45-a8d5-5f7260c0f861', 'role': 'user', 'content': 'Write me an appropriate HR policy for AI usage when dealing with potentially CUI usage', 'timestamp': 1766515090}, {'id': '9e9f9e29-412b-4699-9a07-aaf770282ccf', 'role': 'assistant', 'content': '<details type="reasoning" done="true" duration="1">\n<summary>Thought for 1 seconds</summary>\n> We need to draft an HR policy for AI usage in dealing with potentially Controlled Unclassified  - {}
 
-2025-12-23 19:03:11.888 | INFO     | function_output_to_document:action:1530 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '6c665d55-ffba-4c45-a8d5-5f7260c0f861', 'role': 'user', 'content': 'Write me an appropriate HR policy for AI usage when dealing with potentially CUI usage', 'timestamp': 1766515090}, {'id': '9e9f9e29-412b-4699-9a07-aaf770282ccf', 'role': 'assistant', 'content': '<details type="reasoning" done="true" duration="1">\n<summary>Thought for 1 seconds</summary>\n> We need to draft an HR policy for AI usage in dealing with potentially Controlled Unclassified  - {}
+[DOC_FORMATTER] No file provided, prompting user for upload
 
-2025-12-23 19:03:11.891 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:56406 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
-
-2025-12-23 19:03:11.917 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:56406 - "POST /api/v1/chats/4e9ae569-882a-4cf4-b75e-84446d23dc1e HTTP/1.1" 200 - {}
-
-2025-12-23 19:03:11.924 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:56406 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
-
-2025-12-23 19:03:11.933 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:56406 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
+[DOC_FORMATTER] Using __event_call__ to prompt for file
