@@ -1606,21 +1606,38 @@ class Action:
                                     '[data-action="output_to_document"]',
                                     'button[onclick*="output_to_document"]',
                                     '.action-button',
-                                    '[data-function="output_to_document"]',
-                                    'button:contains("output_to_document")'
+                                    '[data-function="output_to_document"]'
                                 ];
 
                                 let actionButton = null;
                                 for (const selector of actionSelectors) {{
-                                    actionButton = document.querySelector(selector);
-                                    if (actionButton) break;
+                                    try {{
+                                        actionButton = document.querySelector(selector);
+                                        if (actionButton) break;
+                                    }} catch (e) {{
+                                        // Invalid selector, skip it
+                                        console.log('Invalid selector:', selector);
+                                    }}
                                 }}
 
-                                // Also try to find buttons by text content
+                                // Also try to find buttons by text content or attributes
                                 if (!actionButton) {{
                                     const allButtons = document.querySelectorAll('button');
                                     for (const btn of allButtons) {{
+                                        // Check text content
                                         if (btn.textContent && btn.textContent.includes('output_to_document')) {{
+                                            actionButton = btn;
+                                            break;
+                                        }}
+                                        // Check data attributes
+                                        if (btn.getAttribute('data-action') === 'output_to_document' ||
+                                            btn.getAttribute('data-function') === 'output_to_document') {{
+                                            actionButton = btn;
+                                            break;
+                                        }}
+                                        // Check onclick attribute
+                                        const onclick = btn.getAttribute('onclick');
+                                        if (onclick && onclick.includes('output_to_document')) {{
                                             actionButton = btn;
                                             break;
                                         }}
