@@ -1,16 +1,6 @@
-injected.js:1  POST http://ai.trivector.local:3000/api/chat/actions/output_to_document 400 (Bad Request)
-window.fetch @ fetcher.js:76
-value @ injected.js:1
-window.fetch @ VM559:50
-reader.onload @ VM552:191
-FileReader
-document.getElementById.onclick @ VM552:280Understand this error
-VM552:199 Response status: 400 Bad Request
-VM552:249 API call failed: 400 {"detail":"Model not found"}
-reader.onload @ VM552:249
-FileReader
-document.getElementById.onclick @ VM552:280
-VM552:260 File data stored. Click action button to process.
+VM968:51 Uncaught (in promise) TypeError: Cannot read properties of null (reading 'style')
+    at showStatus (eval at Pt (Chat.svelte:388:33), <anonymous>:51:27)
+    at reader.onload (eval at Pt (Chat.svelte:388:33), <anonymous>:181:25)
 
 [DOC_FORMATTER] Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
@@ -24,12 +14,14 @@ VM552:260 File data stored. Click action button to process.
 
 [DOC_FORMATTER] Using __event_call__ with execute type to show file upload modal
 
-2025-12-23 19:47:51.848 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
+2025-12-23 19:52:29.721 | INFO     | function_output_to_document:action:1714 - Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id'] - {}
 
-2025-12-23 19:47:51.876 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/v1/chats/889374d1-0963-491e-89cd-5cb47f582b3c HTTP/1.1" 200 - {}
+2025-12-23 19:52:29.721 | INFO     | function_output_to_document:action:1715 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '773b1449-c93e-4ad2-b47d-789e66bf715f', 'role': 'user', 'content': "Help me create a company IT policy document. This should be thorough as to cover most policies. Say the company name is TriVector Services Inc and I want to use tables where applicable. Let's say I want this to be a 15 page document so be VERY thorough and detailed as to meet the length requiremnt. Use proper indenting, bulleting, tables, italics, and other kinds of text data to make  - {}
 
-2025-12-23 19:47:51.889 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
+2025-12-23 19:52:29.727 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
 
-2025-12-23 19:47:51.900 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
+2025-12-23 19:52:29.754 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "POST /api/v1/chats/889374d1-0963-491e-89cd-5cb47f582b3c HTTP/1.1" 200 - {}
 
-2025-12-23 19:47:55.903 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/chat/actions/output_to_document HTTP/1.1" 400 - {}
+2025-12-23 19:52:29.766 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
+
+2025-12-23 19:52:29.781 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
