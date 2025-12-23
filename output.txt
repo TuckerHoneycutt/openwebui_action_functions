@@ -1,74 +1,35 @@
-Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
-:3000/api/v1/actions/output_to_document:1  Failed to load resource: the server responded with a status of 405 (Method Not Allowed)Understand this error
-VM172:140 Action call failed: All API endpoints failed Response: null
-reader.onload @ VM172:140
 injected.js:1  POST http://ai.trivector.local:3000/api/chat/actions/output_to_document 400 (Bad Request)
 window.fetch @ fetcher.js:76
 value @ injected.js:1
-eval @ VM172:80
-reader.onload @ VM172:111
+window.fetch @ VM559:50
+reader.onload @ VM552:191
 FileReader
-document.getElementById.onclick @ VM172:148Understand this error
-injected.js:1  POST http://ai.trivector.local:3000/api/v1/actions/output_to_document 405 (Method Not Allowed)
-window.fetch @ fetcher.js:76
-value @ injected.js:1
-eval @ VM172:100
-reader.onload @ VM172:111
+document.getElementById.onclick @ VM552:280Understand this error
+VM552:199 Response status: 400 Bad Request
+VM552:249 API call failed: 400 {"detail":"Model not found"}
+reader.onload @ VM552:249
 FileReader
-document.getElementById.onclick @ VM172:148Understand this error
-VM172:140 Action call failed: All API endpoints failed Response: null
+document.getElementById.onclick @ VM552:280
+VM552:260 File data stored. Click action button to process.
 
 [DOC_FORMATTER] Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
 [DOC_FORMATTER] Body content preview: {'model': 'gpt-oss:20b', 'messages': [{'id': '773b1449-c93e-4ad2-b47d-789e66bf715f', 'role': 'user', 'content': "Help me create a company IT policy document. This should be thorough as to cover most p
 
+[DOC_FORMATTER] Body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
+
+[DOC_FORMATTER] File in body: False
+
 [DOC_FORMATTER] No file provided, prompting user for upload
 
 [DOC_FORMATTER] Using __event_call__ with execute type to show file upload modal
 
-2025-12-23 19:30:47.194 | INFO     | function_output_to_document:action:1677 - Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id'] - {}
+2025-12-23 19:47:51.848 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
 
-2025-12-23 19:30:47.194 | INFO     | function_output_to_document:action:1678 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '773b1449-c93e-4ad2-b47d-789e66bf715f', 'role': 'user', 'content': "Help me create a company IT policy document. This should be thorough as to cover most policies. Say the company name is TriVector Services Inc and I want to use tables where applicable. Let's say I want this to be a 15 page document so be VERY thorough and detailed as to meet the length requiremnt. Use proper indenting, bulleting, tables, italics, and other kinds of text data to make  - {}
+2025-12-23 19:47:51.876 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/v1/chats/889374d1-0963-491e-89cd-5cb47f582b3c HTTP/1.1" 200 - {}
 
-2025-12-23 19:30:47.199 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:58662 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
+2025-12-23 19:47:51.889 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
 
-2025-12-23 19:30:47.227 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:58662 - "POST /api/v1/chats/889374d1-0963-491e-89cd-5cb47f582b3c HTTP/1.1" 200 - {}
+2025-12-23 19:47:51.900 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
 
-2025-12-23 19:30:47.239 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:58662 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
-
-2025-12-23 19:30:47.250 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:58662 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
-
-2025-12-23 19:30:53.266 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:54900 - "POST /api/chat/actions/output_to_document HTTP/1.1" 400 - {}
-
-2025-12-23 19:30:53.272 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:54900 - "POST /api/v1/actions/output_to_document HTTP/1.1" 405 - {}
-
-2025-12-23 19:31:02.987 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55898 - "GET /manifest.json HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:02.990 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55882 - "GET /static/custom.css HTTP/1.1" 304 - {}
-
-2025-12-23 19:31:02.991 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55886 - "GET /_app/immutable/assets/29.wEbTgpRj.css HTTP/1.1" 304 - {}
-
-2025-12-23 19:31:04.047 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55898 - "GET /_app/immutable/nodes/8.D_JCX8-z.js.map HTTP/1.1" 304 - {}
-
-2025-12-23 19:31:04.052 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55886 - "GET /_app/immutable/nodes/3.XWd4YOEW.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.055 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55900 - "GET /_app/immutable/nodes/17.CXIj_iUG.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.056 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55882 - "GET /_app/immutable/nodes/9.D0gmmIQa.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.060 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55912 - "GET /_app/immutable/chunks/DQtrEHa0.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.061 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55922 - "GET /_app/immutable/chunks/D3OBn0Y5.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.072 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55898 - "GET /_app/immutable/chunks/V4NzNuWG.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.080 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55886 - "GET /_app/immutable/chunks/gP4IZ9E4.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.080 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55882 - "GET /_app/immutable/nodes/18.Bn8GBho3.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.082 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55900 - "GET /_app/immutable/chunks/CICvqL9d.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.090 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55922 - "GET /_app/immutable/nodes/12.D9Mnkmb1.js.map HTTP/1.1" 200 - {}
-
-2025-12-23 19:31:04.090 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:55912 - "GET /_app/immutable/chunks/tLyQecSR.js.map HTTP/1.1" 200 - {}
-
+2025-12-23 19:47:55.903 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:51486 - "POST /api/chat/actions/output_to_document HTTP/1.1" 400 - {}
