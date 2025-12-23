@@ -36,17 +36,13 @@ import json
 import uuid
 from typing import Dict, List, Any, Optional
 
-# Import OpenWebUI action decorator (optional - has fallback)
+# Import Pydantic for Valves class
 try:
-    from openwebui import action
+    from pydantic import BaseModel
 except ImportError:
-    # Fallback decorator if openwebui is not available (for testing outside OpenWebUI)
-    def action(name: str = None, description: str = None, **kwargs):
-        def decorator(func):
-            func._action_name = name or func.__name__
-            func._action_description = description or func.__doc__
-            return func
-        return decorator
+    # Fallback BaseModel if pydantic is not available
+    class BaseModel:
+        pass
 
 # Import python-docx dependencies (REQUIRED)
 try:
@@ -1434,43 +1430,53 @@ class DocumentStyleApplier:
         return buffer.getvalue()
 
 
-@action(
-    name="format_chat_with_document_style",
-    description="Format your chat content using styling from an uploaded DOCX or PDF document. Click to open the upload interface.",
-    parameters={
-        "type": "object",
-        "properties": {}
-    }
-)
-def format_chat_with_document_style(
-    file: Any = None,
-    chat_messages: List[Dict[str, str]] = None,
-    messages: List[Dict[str, str]] = None,
-    **kwargs
-) -> Dict[str, Any]:
+class Action:
     """
-    OpenWebUI action function that:
-    1. Shows a modern GUI interface when first called (button click)
-    2. Accepts a document upload (DOCX or PDF)
-    3. Extracts styling information from the document
-    4. Formats the chat messages using the extracted styles
-    5. Returns a formatted DOCX document
-
-    Args:
-        file: Uploaded file object (DOCX or PDF) - can be file object, file path, or base64 string
-        chat_messages: List of chat messages with 'role' and 'content' keys
-        messages: Alternative parameter name for chat messages
-        **kwargs: Additional parameters from OpenWebUI context (may include 'messages', 'chat_history', etc.)
-
-    Returns:
-        Dictionary with GUI HTML (to show modal), download link, or file data
+    OpenWebUI Action class for Document Style Formatter.
+    Extracts styling from DOCX/PDF documents and applies it to chat content.
     """
-    # If no file provided, return JavaScript to inject and show the GUI modal
-    if file is None and not kwargs.get('uploaded_file') and not kwargs.get('file'):
+
+    class Valves(BaseModel):
+        """Configuration parameters for the action."""
+        pass
+
+    def __init__(self):
+        """Initialize the Action with Valves configuration."""
+        self.valves = self.Valves()
+
+    async def action(self, body: dict, **kwargs) -> Optional[dict]:
+        """
+        OpenWebUI action method that:
+        1. Shows a modern GUI interface when first called (button click)
+        2. Accepts a document upload (DOCX or PDF)
+        3. Extracts styling information from the document
+        4. Formats the chat messages using the extracted styles
+        5. Returns a formatted DOCX document
+
+        Args:
+            body: Dictionary containing action parameters including:
+                - file: Uploaded file object (DOCX or PDF) - can be file object, file path, or base64 string
+                - chat_messages: List of chat messages with 'role' and 'content' keys
+                - messages: Alternative parameter name for chat messages
+            **kwargs: Additional parameters from OpenWebUI context (may include 'messages', 'chat_history', etc.)
+
+        Returns:
+            Dictionary with GUI HTML (to show modal), download link, or file data
+        """
+        # Extract parameters from body
+        file = body.get('file')
+        chat_messages = body.get('chat_messages')
+        messages = body.get('messages')
+
+        # Merge body and kwargs for backward compatibility
+        merged_kwargs = {**body, **kwargs}
+
+        # If no file provided, return JavaScript to inject and show the GUI modal
+        if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file'):
         gui_html = generate_modern_gui()
 
-        # Get chat messages from context if available
-        chat_msgs = messages or chat_messages or kwargs.get('messages', kwargs.get('chat_messages', kwargs.get('chat_history', [])))
+            # Get chat messages from context if available
+            chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
 
         # Return result with HTML that will be injected into the page
         # OpenWebUI will render HTML in the response
@@ -1488,84 +1494,84 @@ def format_chat_with_document_style(
             </body>'''
         )
 
-        return {
-            "result": "📄 Document Style Formatter - Upload a document to format your chat",
-            "html": gui_with_messages,
-            "success": True,
-            "_chat_messages": chat_msgs  # Store messages for JavaScript access
-        }
-
-    try:
-        # Handle file upload - support multiple formats
-        file_content = None
-        file_ext = None
-
-        if file is None:
-            # Try to get file from kwargs
-            file = kwargs.get('uploaded_file', kwargs.get('file', None))
-
-        if file is None:
-            # Return GUI if no file
-            gui_html = generate_modern_gui()
             return {
-                "type": "html",
-                "content": gui_html,
+                "result": "📄 Document Style Formatter - Upload a document to format your chat",
+                "html": gui_with_messages,
                 "success": True,
-                "message": "Please upload a document to continue."
+                "_chat_messages": chat_msgs  # Store messages for JavaScript access
             }
 
-        # Handle different file input types
-        if hasattr(file, 'read'):
-            # File-like object
-            file_content = file.read()
-            filename = getattr(file, 'filename', 'document.docx')
-            file_ext = os.path.splitext(filename)[1].lower()
-        elif isinstance(file, str):
-            # Could be file path or base64 string
-            if os.path.exists(file):
-                # File path
-                with open(file, 'rb') as f:
-                    file_content = f.read()
-                file_ext = os.path.splitext(file)[1].lower()
-            elif file.startswith('data:'):
-                # Data URI
-                header, encoded = file.split(',', 1)
-                file_content = base64.b64decode(encoded)
-                # Extract extension from mime type
-                if 'pdf' in header.lower():
-                    file_ext = '.pdf'
-                elif 'word' in header.lower() or 'docx' in header.lower():
-                    file_ext = '.docx'
-            else:
-                # Try as base64 (raw base64 string)
-                try:
-                    file_content = base64.b64decode(file)
-                    # Try to get extension from kwargs
-                    file_ext = kwargs.get('file_extension', '.docx')
-                    if file_ext and not file_ext.startswith('.'):
-                        file_ext = '.' + file_ext
-                except Exception as e:
-                    return {"error": f"Invalid file format: {str(e)}. Please provide a file object, file path, or base64 string."}
-        elif isinstance(file, bytes):
-            file_content = file
-            file_ext = kwargs.get('file_extension', '.docx')
-        else:
-            return {"error": "Invalid file format. Please upload a DOCX or PDF file."}
-
-        if file_content is None:
-            return {"error": "Could not read file content."}
-
-        # Validate file extension
-        if file_ext not in ['.docx', '.pdf']:
-            return {"error": f"Unsupported file format: {file_ext}. Please upload a DOCX or PDF file."}
-
-        # Save uploaded file temporarily
-        temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
-        temp_input.write(file_content)
-        temp_input_path = temp_input.name
-        temp_input.close()
-
         try:
+            # Handle file upload - support multiple formats
+            file_content = None
+            file_ext = None
+
+            if file is None:
+                # Try to get file from merged_kwargs
+                file = merged_kwargs.get('uploaded_file', merged_kwargs.get('file', None))
+
+            if file is None:
+                # Return GUI if no file
+                gui_html = generate_modern_gui()
+                return {
+                    "type": "html",
+                    "content": gui_html,
+                    "success": True,
+                    "message": "Please upload a document to continue."
+                }
+
+            # Handle different file input types
+            if hasattr(file, 'read'):
+                # File-like object
+                file_content = file.read()
+                filename = getattr(file, 'filename', 'document.docx')
+                file_ext = os.path.splitext(filename)[1].lower()
+            elif isinstance(file, str):
+                # Could be file path or base64 string
+                if os.path.exists(file):
+                    # File path
+                    with open(file, 'rb') as f:
+                        file_content = f.read()
+                    file_ext = os.path.splitext(file)[1].lower()
+                elif file.startswith('data:'):
+                    # Data URI
+                    header, encoded = file.split(',', 1)
+                    file_content = base64.b64decode(encoded)
+                    # Extract extension from mime type
+                    if 'pdf' in header.lower():
+                        file_ext = '.pdf'
+                    elif 'word' in header.lower() or 'docx' in header.lower():
+                        file_ext = '.docx'
+                else:
+                    # Try as base64 (raw base64 string)
+                    try:
+                        file_content = base64.b64decode(file)
+                        # Try to get extension from merged_kwargs
+                        file_ext = merged_kwargs.get('file_extension', '.docx')
+                        if file_ext and not file_ext.startswith('.'):
+                            file_ext = '.' + file_ext
+                    except Exception as e:
+                        return {"error": f"Invalid file format: {str(e)}. Please provide a file object, file path, or base64 string."}
+            elif isinstance(file, bytes):
+                file_content = file
+                file_ext = merged_kwargs.get('file_extension', '.docx')
+            else:
+                return {"error": "Invalid file format. Please upload a DOCX or PDF file."}
+
+            if file_content is None:
+                return {"error": "Could not read file content."}
+
+            # Validate file extension
+            if file_ext not in ['.docx', '.pdf']:
+                return {"error": f"Unsupported file format: {file_ext}. Please upload a DOCX or PDF file."}
+
+            # Save uploaded file temporarily
+            temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+            temp_input.write(file_content)
+            temp_input_path = temp_input.name
+            temp_input.close()
+
+            try:
             # Extract styles
             extractor = DocumentStyleExtractor()
             if file_ext == '.docx':
@@ -1578,12 +1584,12 @@ def format_chat_with_document_style(
                 chat_messages = messages
 
             if chat_messages is None:
-                # Try to get from kwargs with various common names
+                # Try to get from merged_kwargs with various common names
                 chat_messages = (
-                    kwargs.get('messages') or
-                    kwargs.get('chat_messages') or
-                    kwargs.get('chat_history') or
-                    kwargs.get('history') or
+                    merged_kwargs.get('messages') or
+                    merged_kwargs.get('chat_messages') or
+                    merged_kwargs.get('chat_history') or
+                    merged_kwargs.get('history') or
                     []
                 )
 
@@ -1680,11 +1686,10 @@ if __name__ == "__main__":
     print("\n5. Click the button to open the document upload GUI")
     print("\n" + "=" * 70)
 
-    # Verify the action function is properly decorated
-    if hasattr(format_chat_with_document_style, '_action_name'):
-        print(f"\n✓ Action function registered: {format_chat_with_document_style._action_name}")
+    # Verify the Action class is properly defined
+    if 'Action' in globals():
+        print("\n✓ Action class found and registered")
     else:
-        print("\n⚠ Action function may not be properly registered")
-        print("  Make sure 'from openwebui import action' works in your environment")
+        print("\n⚠ Action class may not be properly defined")
 
     print("\n" + "=" * 70)
