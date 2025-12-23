@@ -1467,8 +1467,17 @@ class Action:
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
-            // Store chat messages for later use
+            // Store chat messages and model for later use
             window.docFormatterChatMsgs = {chat_msgs_json};
+            // Try to get current model from page
+            try {{
+                const modelSelect = document.querySelector('select[name="model"], [data-model]');
+                if (modelSelect) {{
+                    window.docFormatterModel = modelSelect.value || modelSelect.getAttribute('data-model');
+                }}
+            }} catch (e) {{
+                window.docFormatterModel = null;
+            }}
 
             const closeModal = () => {{
                 if (document.body.contains(overlay)) {{
@@ -1505,82 +1514,41 @@ class Action:
                     const base64 = e.target.result.split(',')[1];
 
                     try {{
-                        const actionData = {{
-                            file: base64,
-                            file_extension: '.' + file.name.split('.').pop().toLowerCase(),
-                            messages: window.docFormatterChatMsgs || []
-                        }};
-
                         showStatus('Sending file to server...', false);
 
-                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
-                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
-                                       localStorage.getItem('lastChatId');
+                        // Store file data in localStorage so it persists and can be accessed
+                        // when the action function is called again
+                        const fileData = {{
+                            file: base64,
+                            file_extension: '.' + file.name.split('.').pop().toLowerCase(),
+                            messages: window.docFormatterChatMsgs || [],
+                            timestamp: Date.now()
+                        }};
 
-                        const apiCalls = [];
-                        apiCalls.push(() => fetch('/api/chat/actions/output_to_document', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify(actionData)
-                        }}));
+                        localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
+                        window.docFormatterFileData = fileData;
 
-                        if (chatId) {{
-                            apiCalls.push(() => fetch(`/api/v1/chats/${{chatId}}`, {{
-                                method: 'POST',
-                                headers: {{ 'Content-Type': 'application/json' }},
-                                body: JSON.stringify({{
-                                    messages: window.docFormatterChatMsgs || [],
-                                    functions: [{{
-                                        name: 'output_to_document',
-                                        arguments: JSON.stringify(actionData)
-                                    }}]
-                                }})
-                            }}));
-                        }}
+                        showStatus('File data stored. Please click the action button again to process.', false);
+                        console.log('File data stored in localStorage. Click action button to process.');
+                        console.log('File data:', {{
+                            file_extension: fileData.file_extension,
+                            messages_count: fileData.messages?.length || 0
+                        }});
 
-                        apiCalls.push(() => fetch('/api/v1/actions/output_to_document', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify(actionData)
-                        }}));
-
-                        let result = null;
-                        let lastError = 'All API endpoints failed';
-
-                        for (const apiCall of apiCalls) {{
-                            try {{
-                                const response = await apiCall();
-                                if (response.ok) {{
-                                    const data = await response.json();
-                                    if (data.file || data.success || data.content) {{
-                                        result = data;
-                                        break;
-                                    }}
+                        // Auto-close modal after showing message
+                        setTimeout(() => {{
+                            closeModal();
+                            // Show a notification that user should click the button
+                            const notification = document.createElement('div');
+                            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
+                            notification.textContent = '✓ File ready! Click the action button again to process.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => {{
+                                if (document.body.contains(notification)) {{
+                                    document.body.removeChild(notification);
                                 }}
-                            }} catch (err) {{
-                                lastError = err.message;
-                                continue;
-                            }}
-                        }}
-
-                        if (result && (result.success || result.file)) {{
-                            showStatus('✓ Document formatted successfully!', false);
-                            if (result.file && result.file.content) {{
-                                const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = result.file.filename || 'formatted_chat.docx';
-                                document.body.appendChild(a);
-                                a.click();
-                                URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-                            }}
-                            setTimeout(() => closeModal(), 2000);
-                        }} else {{
-                            console.error('Action call failed:', lastError, 'Response:', result);
-                            showStatus('Error processing file. Check console (F12) for details. Error: ' + (result?.error || result?.content || lastError), true);
-                        }}
+                            }}, 5000);
+                        }}, 2000);
                     }} catch (error) {{
                         showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
                         console.error('Document formatter error:', error);
@@ -1639,13 +1607,30 @@ class Action:
         chat_messages = body.get('chat_messages')
         messages = body.get('messages')
 
+        # Check if this is a function call with arguments (from JavaScript)
+        if file is None and 'arguments' in body:
+            try:
+                import json
+                args_str = body.get('arguments')
+                if isinstance(args_str, str):
+                    args = json.loads(args_str)
+                    file = args.get('file') or args.get('file_data')
+                    if file:
+                        print(f"[DOC_FORMATTER] File found in function arguments", file=sys.stderr)
+                        # Also get file_extension and messages from args
+                        merged_kwargs['file_extension'] = args.get('file_extension', '.docx')
+                        if args.get('messages'):
+                            messages = args.get('messages')
+            except Exception as e:
+                print(f"[DOC_FORMATTER] Error parsing function arguments: {str(e)}", file=sys.stderr)
+
         # Merge body with all available context
         merged_kwargs = {**body}
         if __user__:
             merged_kwargs['__user__'] = __user__
 
         # If no file provided, use __event_call__ to prompt for file upload
-        if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file'):
+        if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file') and not merged_kwargs.get('file_data'):
             print("[DOC_FORMATTER] No file provided, prompting user for upload", file=sys.stderr)
 
             # Get chat messages from context
