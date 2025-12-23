@@ -1538,35 +1538,76 @@ class Action:
                         window.docFormatterFileData = fileData;
                         localStorage.setItem('docFormatterFileData', JSON.stringify(fileData));
 
+                        // Install fetch interceptor FIRST, before closing modal
+                        // This ensures it's ready when the action is called
+                        console.log('Installing fetch interceptor for file data injection');
+                        const originalFetch = window.fetch;
+                        window.fetch = function(...args) {{
+                            const url = args[0];
+                            const options = args[1] || {{}};
+
+                            // Check if this is a call to our action endpoint
+                            if (typeof url === 'string' && (url.includes('output_to_document') || url.includes('/api/chat/actions/'))) {{
+                                const storedData = localStorage.getItem('docFormatterFileData');
+                                if (storedData) {{
+                                    try {{
+                                        const data = JSON.parse(storedData);
+                                        console.log('Fetch interceptor: Found file data, injecting into request');
+
+                                        if (options.body) {{
+                                            try {{
+                                                const body = JSON.parse(options.body);
+                                                if (!body.file) {{
+                                                    console.log('Fetch interceptor: Injecting file data into existing body');
+                                                    body.file = data.file;
+                                                    body.file_extension = data.file_extension;
+                                                    body.messages = data.messages;
+                                                    body.chat_messages = data.messages;
+                                                    options.body = JSON.stringify(body);
+                                                    localStorage.removeItem('docFormatterFileData');
+                                                    console.log('Fetch interceptor: File data injected successfully');
+                                                }}
+                                            }} catch (parseError) {{
+                                                console.error('Fetch interceptor: Error parsing request body:', parseError);
+                                            }}
+                                        }} else {{
+                                            // Create new body with file data
+                                            console.log('Fetch interceptor: Creating new request body with file data');
+                                            options.body = JSON.stringify({{
+                                                file: data.file,
+                                                file_extension: data.file_extension,
+                                                messages: data.messages,
+                                                chat_messages: data.messages
+                                            }});
+                                            options.headers = options.headers || {{}};
+                                            options.headers['Content-Type'] = 'application/json';
+                                            localStorage.removeItem('docFormatterFileData');
+                                        }}
+                                    }} catch (e) {{
+                                        console.error('Fetch interceptor: Error processing file data:', e);
+                                    }}
+                                }}
+                            }}
+
+                            return originalFetch.apply(this, args);
+                        }};
+
                         // Show status before closing modal
                         showStatus('File data prepared. Processing...', false);
 
-                        // Close modal after a brief delay to show status
+                        // Close modal and trigger action
                         setTimeout(() => {{
                             closeModal();
 
-                            // Trigger the action function call with file data after modal closes
-                            console.log('Preparing to trigger action function with file data');
-
-                            // Create a custom event to trigger action processing
-                            // This simulates clicking the action button but with file data included
-                            const actionEvent = new CustomEvent('openwebui:action:call', {{
-                                detail: {{
-                                    action: 'output_to_document',
-                                    data: fileData
-                                }}
-                            }});
-                            document.dispatchEvent(actionEvent);
-
-                            // Also try to find and trigger the action button programmatically
-                            // Look for action buttons and simulate a click
+                            // Try to find and trigger the action button programmatically
                             setTimeout(() => {{
                                 // Try multiple ways to find the action button
                                 const actionSelectors = [
                                     '[data-action="output_to_document"]',
                                     'button[onclick*="output_to_document"]',
                                     '.action-button',
-                                    '[data-function="output_to_document"]'
+                                    '[data-function="output_to_document"]',
+                                    'button:contains("output_to_document")'
                                 ];
 
                                 let actionButton = null;
@@ -1575,52 +1616,30 @@ class Action:
                                     if (actionButton) break;
                                 }}
 
+                                // Also try to find buttons by text content
+                                if (!actionButton) {{
+                                    const allButtons = document.querySelectorAll('button');
+                                    for (const btn of allButtons) {{
+                                        if (btn.textContent && btn.textContent.includes('output_to_document')) {{
+                                            actionButton = btn;
+                                            break;
+                                        }}
+                                    }}
+                                }}
+
                                 if (actionButton) {{
                                     console.log('Found action button, triggering click with file data');
-                                    // Store file data so it's available when button is clicked
                                     window.docFormatterPendingProcess = true;
                                     actionButton.click();
                                 }} else {{
-                                    console.log('Action button not found, trying alternative method');
-                                    // Alternative: Use fetch interceptor and show notification
+                                    console.log('Action button not found. File data is stored and fetch interceptor is active.');
+                                    console.log('Please click the action button manually - file data will be injected automatically.');
+
+                                    // Show notification
                                     const notification = document.createElement('div');
                                     notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 25px; border-radius: 8px; z-index: 10001; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-weight: 600;';
                                     notification.textContent = '✓ File ready! Click the action button to process.';
                                     document.body.appendChild(notification);
-
-                                    // Install fetch interceptor
-                                    const originalFetch = window.fetch;
-                                    window.fetch = function(...args) {{
-                                        const url = args[0];
-                                        const options = args[1] || {{}};
-
-                                        if (typeof url === 'string' && url.includes('output_to_document')) {{
-                                            const storedData = localStorage.getItem('docFormatterFileData');
-                                            if (storedData) {{
-                                                try {{
-                                                    const data = JSON.parse(storedData);
-                                                    if (options.body) {{
-                                                        const body = JSON.parse(options.body);
-                                                        if (!body.file) {{
-                                                            body.file = data.file;
-                                                            body.file_extension = data.file_extension;
-                                                            body.messages = data.messages;
-                                                            body.chat_messages = data.messages;
-                                                            options.body = JSON.stringify(body);
-                                                            localStorage.removeItem('docFormatterFileData');
-                                                            if (document.body.contains(notification)) {{
-                                                                document.body.removeChild(notification);
-                                                            }}
-                                                        }}
-                                                    }}
-                                                }} catch (e) {{
-                                                    console.error('Error injecting file data:', e);
-                                                }}
-                                            }}
-                                        }}
-
-                                        return originalFetch.apply(this, args);
-                                    }};
 
                                     setTimeout(() => {{
                                         if (document.body.contains(notification)) {{
