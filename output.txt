@@ -1,15 +1,17 @@
-[DOC_FORMATTER] File response (input type=file): <class 'bool'>
+[DOC_FORMATTER] Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
-[DOC_FORMATTER] File response content: False
+[DOC_FORMATTER] Body content preview: {'model': 'gpt-oss:20b', 'messages': [{'id': '6c665d55-ffba-4c45-a8d5-5f7260c0f861', 'role': 'user', 'content': 'Write me an appropriate HR policy for AI usage when dealing with potentially CUI usage'
 
-[DOC_FORMATTER] File response type: <class 'bool'>
+[DOC_FORMATTER] No file provided, prompting user for upload
 
-[DOC_FORMATTER] Empty or False file_response
+[DOC_FORMATTER] Using __event_call__ with execute type to show file upload modal
 
-2025-12-23 19:12:59.146 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:33736 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
+[DOC_FORMATTER] Error showing modal: 'Action' object has no attribute '_get_file_upload_modal'
 
-2025-12-23 19:12:59.171 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:33736 - "POST /api/v1/chats/4e9ae569-882a-4cf4-b75e-84446d23dc1e HTTP/1.1" 200 - {}
+2025-12-23 19:22:01.051 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:44080 - "POST /api/v1/chats/4e9ae569-882a-4cf4-b75e-84446d23dc1e HTTP/1.1" 200 - {}
 
-2025-12-23 19:12:59.179 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:33736 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
+2025-12-23 19:22:01.061 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:44080 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
 
-2025-12-23 19:12:59.188 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:33736 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
+2025-12-23 19:22:01.071 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:44080 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
+
+2025-12-23 19:22:43.259 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:44738 - "GET /_app/version.json HTTP/1.1" 200 - {}
