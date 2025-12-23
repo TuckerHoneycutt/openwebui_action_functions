@@ -1,10 +1,70 @@
-VM968:51 Uncaught (in promise) TypeError: Cannot read properties of null (reading 'style')
-    at showStatus (eval at Pt (Chat.svelte:388:33), <anonymous>:51:27)
-    at reader.onload (eval at Pt (Chat.svelte:388:33), <anonymous>:181:25)
+RichTextInput.svelte:910 [tiptap warn]: Duplicate extension names found: ['codeBlock', 'bulletList', 'listItem', 'listKeymap', 'orderedList']. This can lead to issues.
+vf @ index.js:791
+xa @ index.js:2105
+createExtensionManager @ index.js:4562
+ly @ index.js:4324
+(anonymous) @ RichTextInput.svelte:910
+J @ utils.js:41
+(anonymous) @ Component.js:47
+dt @ scheduler.js:99
+Promise.then
+ft @ scheduler.js:20
+ht @ Component.js:81
+(anonymous) @ Component.js:139
+je @ Chat.svelte:168
+await in je
+n.$$.update @ Chat.svelte:148
+jt @ Component.js:144
+Cce @ Chat.svelte:220
+h @ 19.CRRXY1b5.js:1
+jt @ Component.js:148
+S @ +page.svelte:7
+oe @ dom.js:1228
+nt @ root.svelte:57
+st @ root.svelte:51
+Tt @ utils.js:165
+Gy @ +layout.svelte:344
+p @ +layout.svelte:283
+p @ +layout.svelte:347
+p @ +layout.svelte:275
+ht @ scheduler.js:119
+dt @ scheduler.js:79
+Promise.then
+ft @ scheduler.js:20
+ht @ Component.js:81
+(anonymous) @ Component.js:139
+(anonymous) @ +layout.svelte:244
+await in (anonymous)
+J @ utils.js:41
+(anonymous) @ Component.js:47
+dt @ scheduler.js:99
+Promise.then
+ft @ scheduler.js:20
+ht @ Component.js:81
+(anonymous) @ Component.js:139
+(anonymous) @ +layout.svelte:640
+await in (anonymous)
+J @ utils.js:41
+(anonymous) @ Component.js:47
+dt @ scheduler.js:99
+jt @ Component.js:164
+wt @ root.svelte:23
+ft @ client.js:472
+ee @ client.js:1580
+await in ee
+Ce @ client.js:398
+An @ client.js:1926
+$n @ client.js:323
+await in $n
+(anonymous) @ 60a31cde-bea5-45b6-9739-52fca1b8d34e:120
+Promise.then
+(anonymous) @ 60a31cde-bea5-45b6-9739-52fca1b8d34e:119Understand this warning
+VM2154:108 Preparing to trigger action function with file data
+VM2154:143 Action button not found, trying alternative method
 
 [DOC_FORMATTER] Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
-[DOC_FORMATTER] Body content preview: {'model': 'gpt-oss:20b', 'messages': [{'id': '773b1449-c93e-4ad2-b47d-789e66bf715f', 'role': 'user', 'content': "Help me create a company IT policy document. This should be thorough as to cover most p
+[DOC_FORMATTER] Body content preview: {'model': 'gpt-oss:20b', 'messages': [{'id': '55dba6f1-428e-47c6-84e7-4c6ca4dd770f', 'role': 'user', 'content': 'I have a policy, I want to format it into something that would go in my HR handbook.', 
 
 [DOC_FORMATTER] Body keys: ['model', 'messages', 'chat_id', 'session_id', 'id']
 
@@ -14,14 +74,14 @@ VM968:51 Uncaught (in promise) TypeError: Cannot read properties of null (readin
 
 [DOC_FORMATTER] Using __event_call__ with execute type to show file upload modal
 
-2025-12-23 19:52:29.721 | INFO     | function_output_to_document:action:1714 - Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id'] - {}
+2025-12-23 20:18:08.598 | INFO     | function_output_to_document:action:1726 - Action called with body keys: ['model', 'messages', 'chat_id', 'session_id', 'id'] - {}
 
-2025-12-23 19:52:29.721 | INFO     | function_output_to_document:action:1715 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '773b1449-c93e-4ad2-b47d-789e66bf715f', 'role': 'user', 'content': "Help me create a company IT policy document. This should be thorough as to cover most policies. Say the company name is TriVector Services Inc and I want to use tables where applicable. Let's say I want this to be a 15 page document so be VERY thorough and detailed as to meet the length requiremnt. Use proper indenting, bulleting, tables, italics, and other kinds of text data to make  - {}
+2025-12-23 20:18:08.598 | INFO     | function_output_to_document:action:1727 - Body content: {'model': 'gpt-oss:20b', 'messages': [{'id': '55dba6f1-428e-47c6-84e7-4c6ca4dd770f', 'role': 'user', 'content': 'I have a policy, I want to format it into something that would go in my HR handbook.', 'timestamp': 1766520388}, {'id': 'ce95a5da-f696-4acf-8d58-5e093534a8ff', 'role': 'assistant', 'content': '<details type="reasoning" done="true" duration="0">\n<summary>Thought for 0 seconds</summary>\n> The user wants to format a policy into something that would go in an HR handbook. They have a pol - {}
 
-2025-12-23 19:52:29.727 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
+2025-12-23 20:18:08.606 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:53098 - "POST /api/chat/actions/output_to_document HTTP/1.1" 200 - {}
 
-2025-12-23 19:52:29.754 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "POST /api/v1/chats/889374d1-0963-491e-89cd-5cb47f582b3c HTTP/1.1" 200 - {}
+2025-12-23 20:18:08.625 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:53098 - "POST /api/v1/chats/60a31cde-bea5-45b6-9739-52fca1b8d34e HTTP/1.1" 200 - {}
 
-2025-12-23 19:52:29.766 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
+2025-12-23 20:18:08.635 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:53098 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200 - {}
 
-2025-12-23 19:52:29.781 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:52804 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
+2025-12-23 20:18:08.645 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 172.17.0.1:53098 - "GET /api/v1/folders/ HTTP/1.1" 200 - {}
