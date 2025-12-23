@@ -1302,19 +1302,75 @@ class DocumentStyleExtractor:
                     const base64 = e.target.result.split(',')[1];
 
                     try {{
-                        // Call the action function again with the file
-                        const response = await fetch('/api/chat/actions/output_to_document', {{
+                        // Store file data and trigger action call via OpenWebUI's mechanism
+                        // We'll use the chat API to call the function with file data
+                        const actionData = {{
+                            file: base64,
+                            file_extension: '.' + file.name.split('.').pop().toLowerCase(),
+                            messages: window.docFormatterChatMsgs || []
+                        }};
+
+                        showStatus('Sending file to server...', false);
+
+                        // Try to call via OpenWebUI's chat/function API
+                        // First, try to find the chat ID from the current page
+                        const chatId = window.location.pathname.match(/\\/chat\\/([^\\/]+)/)?.[1] ||
+                                       document.querySelector('[data-chat-id]')?.getAttribute('data-chat-id') ||
+                                       localStorage.getItem('lastChatId');
+
+                        // Try multiple API patterns
+                        const apiCalls = [];
+
+                        // Pattern 1: Direct action endpoint (if available)
+                        apiCalls.push(() => fetch('/api/chat/actions/output_to_document', {{
                             method: 'POST',
                             headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{
-                                file: base64,
-                                file_extension: '.' + file.name.split('.').pop().toLowerCase(),
-                                messages: window.docFormatterChatMsgs || []
-                            }})
-                        }});
+                            body: JSON.stringify(actionData)
+                        }}));
 
-                        const result = await response.json();
-                        if (result.success) {{
+                        // Pattern 2: Via chat API with function call
+                        if (chatId) {{
+                            apiCalls.push(() => fetch(`/api/v1/chats/${{chatId}}`, {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{
+                                    messages: window.docFormatterChatMsgs || [],
+                                    functions: [{{
+                                        name: 'output_to_document',
+                                        arguments: JSON.stringify(actionData)
+                                    }}]
+                                }})
+                            }}));
+                        }}
+
+                        // Pattern 3: Generic action endpoint
+                        apiCalls.push(() => fetch('/api/v1/actions/output_to_document', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(actionData)
+                        }}));
+
+                        let result = null;
+                        let lastError = 'All API endpoints failed';
+
+                        for (const apiCall of apiCalls) {{
+                            try {{
+                                const response = await apiCall();
+                                if (response.ok) {{
+                                    const data = await response.json();
+                                    // Check if response contains file data or success indicator
+                                    if (data.file || data.success || data.content) {{
+                                        result = data;
+                                        break;
+                                    }}
+                                }}
+                            }} catch (err) {{
+                                lastError = err.message;
+                                continue;
+                            }}
+                        }}
+
+                        if (result && (result.success || result.file)) {{
                             showStatus('✓ Document formatted successfully!', false);
                             if (result.file && result.file.content) {{
                                 // Trigger download
@@ -1330,10 +1386,13 @@ class DocumentStyleExtractor:
                             }}
                             setTimeout(() => closeModal(), 2000);
                         }} else {{
-                            showStatus('Error: ' + (result.error || result.content || 'Unknown error'), true);
+                            // Fallback: Show error but also log to console for debugging
+                            console.error('Action call failed:', lastError, 'Response:', result);
+                            showStatus('Error processing file. Check console (F12) for details. Error: ' + (result?.error || result?.content || lastError), true);
                         }}
                     }} catch (error) {{
-                        showStatus('Error: ' + error.message, true);
+                        showStatus('Error: ' + error.message + '. Check browser console (F12) for details.', true);
+                        console.error('Document formatter error:', error);
                     }}
                 }};
                 reader.readAsDataURL(file);
