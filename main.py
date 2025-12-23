@@ -1474,6 +1474,19 @@ class Action:
         Returns:
             Dictionary with GUI HTML (to show modal), download link, or file data
         """
+        # Add logging for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Debug logging to stderr (visible in OpenWebUI logs)
+        print(f"[DOC_FORMATTER] Action called with body keys: {list(body.keys())}", file=sys.stderr)
+        print(f"[DOC_FORMATTER] Body content preview: {str(body)[:200]}", file=sys.stderr)
+        try:
+            logger.info(f"Action called with body keys: {list(body.keys())}")
+            logger.info(f"Body content: {str(body)[:500]}")
+        except:
+            pass  # Don't fail if logging isn't configured
+
         # Extract parameters from body
         file = body.get('file')
         chat_messages = body.get('chat_messages')
@@ -1484,35 +1497,48 @@ class Action:
         if __user__:
             merged_kwargs['__user__'] = __user__
 
-        # If no file provided, return JavaScript to inject and show the GUI modal
+        # If no file provided, return HTML GUI
         if file is None and not merged_kwargs.get('uploaded_file') and not merged_kwargs.get('file'):
-            gui_html = generate_modern_gui()
+            try:
+                gui_html = generate_modern_gui()
 
-            # Get chat messages from context if available
-            chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
+                # Get chat messages from context if available
+                chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
 
-            # Return result with HTML that will be injected into the page
-            # OpenWebUI will render HTML in the response
-            # Also inject script to store chat messages
-            chat_messages_json = json.dumps(chat_msgs)
-            gui_with_messages = gui_html.replace(
-                '</body>',
-                f'''<script>
-                    // Store chat messages for the GUI to access
-                    window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
-                    window.__DOC_FORMATTER_RESPONSE__ = {{
-                        _chat_messages: {chat_messages_json}
-                    }};
-                </script>
-                </body>'''
-            )
+                # Return result with HTML - OpenWebUI expects "html" key or direct HTML string
+                chat_messages_json = json.dumps(chat_msgs)
+                gui_with_messages = gui_html.replace(
+                    '</body>',
+                    f'''<script>
+                        // Store chat messages for the GUI to access
+                        window.__DOC_FORMATTER_CHAT_MESSAGES__ = {chat_messages_json};
+                        window.__DOC_FORMATTER_RESPONSE__ = {{
+                            _chat_messages: {chat_messages_json}
+                        }};
+                    </script>
+                    </body>'''
+                )
 
-            return {
-                "result": "📄 Document Style Formatter - Upload a document to format your chat",
-                "html": gui_with_messages,
-                "success": True,
-                "_chat_messages": chat_msgs  # Store messages for JavaScript access
-            }
+                print(f"[DOC_FORMATTER] Returning GUI HTML (length: {len(gui_with_messages)})", file=sys.stderr)
+                # Try multiple return formats for OpenWebUI compatibility
+                # OpenWebUI may expect different formats - try returning HTML directly or in different keys
+                return {
+                    "html": gui_with_messages,
+                    "result": gui_with_messages,  # Some versions expect HTML in result
+                    "content": gui_with_messages,  # Alternative key
+                    "success": True
+                }
+            except Exception as e:
+                import traceback
+                error_msg = f"Error generating GUI: {str(e)}\n{traceback.format_exc()}"
+                try:
+                    logger.error(error_msg)
+                except:
+                    pass
+                return {
+                    "error": error_msg,
+                    "success": False
+                }
 
         try:
             # Handle file upload - support multiple formats
