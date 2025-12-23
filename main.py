@@ -1233,6 +1233,117 @@ class DocumentStyleExtractor:
 
         return self.styles
 
+    def _get_file_upload_modal(self, chat_msgs: List[Dict[str, Any]]) -> str:
+        """Generate JavaScript code to create a file upload modal (like prior.py approach)"""
+        import json
+        chat_msgs_json = json.dumps(chat_msgs)
+
+        return f"""
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;`;
+            const modal = document.createElement('div');
+            modal.style.cssText = `background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 500px; width: 90%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 90vh; overflow-y: auto;`;
+
+            modal.innerHTML = `
+                <h2 style="margin-top: 0; color: #667eea; text-align: center; font-size: 24px; font-weight: 600;">📄 Document Style Formatter</h2>
+                <p style="color: #666; margin-bottom: 20px; text-align: center;">Upload a DOCX or PDF document to extract styling and format your chat content.</p>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">Select Document:</label>
+                    <input type="file" id="docFormatterFileInput" accept=".docx,.pdf" style="width: 100%; padding: 12px; font-size: 14px; border: 2px solid #667eea; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">
+                </div>
+
+                <div id="docFormatterStatus" style="margin: 15px 0; padding: 12px; border-radius: 8px; display: none;"></div>
+
+                <div style="display: flex; justify-content: space-between; gap: 10px;">
+                    <button id="processBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px; font-weight: 600;">Process Document</button>
+                    <button id="cancelBtn" style="background: #f5f5f5; border: 1px solid #ddd; padding: 12px 24px; border-radius: 8px; cursor: pointer; flex-grow: 1; font-size: 16px;">Cancel</button>
+                </div>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Store chat messages for later use
+            window.docFormatterChatMsgs = {chat_msgs_json};
+
+            const closeModal = () => {{
+                if (document.body.contains(overlay)) {{
+                    document.body.removeChild(overlay);
+                }}
+            }};
+
+            const showStatus = (message, isError = false) => {{
+                const statusDiv = document.getElementById('docFormatterStatus');
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = isError ? '#fee' : '#efe';
+                statusDiv.style.color = isError ? '#c33' : '#3c3';
+                statusDiv.style.border = `1px solid ${{isError ? '#c33' : '#3c3'}}`;
+                statusDiv.textContent = message;
+                setTimeout(() => {{ statusDiv.style.display = 'none'; }}, 5000);
+            }};
+
+            // Handle file upload and processing
+            document.getElementById('processBtn').onclick = async () => {{
+                const fileInput = document.getElementById('docFormatterFileInput');
+                const statusDiv = document.getElementById('docFormatterStatus');
+
+                if (!fileInput.files || !fileInput.files[0]) {{
+                    showStatus('Please select a file first.', true);
+                    return;
+                }}
+
+                const file = fileInput.files[0];
+                showStatus('Processing file: ' + file.name + '...', false);
+
+                // Convert file to base64
+                const reader = new FileReader();
+                reader.onload = async function(e) {{
+                    const base64 = e.target.result.split(',')[1];
+
+                    try {{
+                        // Call the action function again with the file
+                        const response = await fetch('/api/chat/actions/output_to_document', {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify({{
+                                file: base64,
+                                file_extension: '.' + file.name.split('.').pop().toLowerCase(),
+                                messages: window.docFormatterChatMsgs || []
+                            }})
+                        }});
+
+                        const result = await response.json();
+                        if (result.success) {{
+                            showStatus('✓ Document formatted successfully!', false);
+                            if (result.file && result.file.content) {{
+                                // Trigger download
+                                const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = result.file.filename || 'formatted_chat.docx';
+                                document.body.appendChild(a);
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                            }}
+                            setTimeout(() => closeModal(), 2000);
+                        }} else {{
+                            showStatus('Error: ' + (result.error || result.content || 'Unknown error'), true);
+                        }}
+                    }} catch (error) {{
+                        showStatus('Error: ' + error.message, true);
+                    }}
+                }};
+                reader.readAsDataURL(file);
+            }};
+
+            document.getElementById('cancelBtn').onclick = closeModal;
+            overlay.onclick = (e) => {{ if (e.target === overlay) closeModal(); }};
+            overlay.onkeydown = (e) => {{ if (e.key === 'Escape') closeModal(); }};
+        """
+
     def extract_from_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """Extract styles from a PDF file by converting to DOCX first."""
         # Convert PDF to DOCX temporarily
@@ -1504,84 +1615,28 @@ class Action:
             # Get chat messages from context
             chat_msgs = messages or chat_messages or merged_kwargs.get('messages', merged_kwargs.get('chat_messages', merged_kwargs.get('chat_history', [])))
 
-            # Skip __event_call__ since it shows text input instead of file input
-            # Go directly to HTML file input which works properly
-            print("[DOC_FORMATTER] Using HTML file input (skipping __event_call__ to avoid text input)", file=sys.stderr)
-            try:
-                # Generate a simple HTML file input form
-                file_input_html = f'''
-<div style="padding: 20px; border: 2px dashed #667eea; border-radius: 12px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
-    <h3 style="color: #667eea; margin-top: 0;">📄 Document Style Formatter</h3>
-    <p>Please upload a DOCX or PDF document to extract styling from:</p>
-    <input type="file" id="docFormatterFileInput" accept=".docx,.pdf" style="padding: 10px; border: 2px solid #667eea; border-radius: 8px; width: 100%; max-width: 400px;">
-    <br><br>
-    <button onclick="handleFileUpload()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600;">
-        Process Document
-    </button>
-    <div id="docFormatterStatus" style="margin-top: 15px;"></div>
-</div>
-
-<script>
-async function handleFileUpload() {{
-    const fileInput = document.getElementById('docFormatterFileInput');
-    const statusDiv = document.getElementById('docFormatterStatus');
-
-    if (!fileInput.files || !fileInput.files[0]) {{
-        statusDiv.innerHTML = '<p style="color: red;">Please select a file first.</p>';
-        return;
-    }}
-
-    const file = fileInput.files[0];
-    statusDiv.innerHTML = '<p style="color: #667eea;">Processing file: ' + file.name + '...</p>';
-
-    // Convert file to base64
-    const reader = new FileReader();
-    reader.onload = async function(e) {{
-        const base64 = e.target.result.split(',')[1];
-
-        // Call the action function again with the file
-        try {{
-            const response = await fetch('/api/chat/actions/output_to_document', {{
-                method: 'POST',
-                headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{
-                    file: base64,
-                    file_extension: '.' + file.name.split('.').pop().toLowerCase(),
-                    messages: {json.dumps(chat_msgs)}
-                }})
-            }});
-
-            const result = await response.json();
-            if (result.success) {{
-                statusDiv.innerHTML = '<p style="color: green;">✓ Document formatted successfully! Check downloads.</p>';
-                if (result.file && result.file.content) {{
-                    // Trigger download
-                    const blob = new Blob([atob(result.file.content)], {{ type: result.file.mime_type }});
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = result.file.filename || 'formatted_chat.docx';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                }}
-            }} else {{
-                statusDiv.innerHTML = '<p style="color: red;">Error: ' + (result.error || 'Unknown error') + '</p>';
-            }}
-        }} catch (error) {{
-            statusDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
-        }}
-    }};
-    reader.readAsDataURL(file);
-}}
-</script>
-'''
+            # Use __event_call__ with type "execute" to show modal (like prior.py)
+            if __event_call__:
+                print("[DOC_FORMATTER] Using __event_call__ with execute type to show file upload modal", file=sys.stderr)
+                try:
+                    await __event_call__({
+                        "type": "execute",
+                        "data": {
+                            "code": self._get_file_upload_modal(chat_msgs)
+                        }
+                    })
+                    return {"message": "File upload modal displayed. Please select a document."}
+                except Exception as e:
+                    print(f"[DOC_FORMATTER] Error showing modal: {str(e)}", file=sys.stderr)
+                    return {
+                        "content": f"Error displaying file upload: {str(e)}",
+                        "success": False
+                    }
+            else:
+                # Fallback if __event_call__ not available
+                print("[DOC_FORMATTER] __event_call__ not available, returning HTML", file=sys.stderr)
                 return {
-                    "content": file_input_html,
-                    "html": file_input_html
-                }
-            except Exception as e:
-                return {
-                    "content": f"📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document.\n\nError: {str(e)}",
+                    "content": "📄 Document Style Formatter\n\nPlease upload a DOCX or PDF document to extract styling from.",
                     "success": False
                 }
 
